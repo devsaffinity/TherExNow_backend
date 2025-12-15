@@ -8,6 +8,7 @@
 
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Apsy.Engine.BackEnd.Generator.Boilerpolate' " />
 	<ItemGroup>
+    <PackageReference Include="AppleReceiptVerifier.NET" Version="1.1.0" />
     <PackageReference Include="Apsy.Common.Api.Auth" Version="4.1.2" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.405.4" />
     <PackageReference Include="AWSSDK.SimpleEmail" Version="3.7.402.2" />
@@ -32,7 +33,7 @@
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="6.0.3" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql.NetTopologySuite" Version="6.0.3" />
     <PackageReference Include="SendGrid" Version="9.28.0" />
-    <PackageReference Include="Stripe.net" Version="40.15.0" />
+    <PackageReference Include="Stripe.net" Version="49.0.0" />
     <PackageReference Include="Twilio" Version="5.76.0" />
 
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
@@ -40,6 +41,7 @@
 		<PackageReference Include="Aps.CommonBack.Auth" Version="1.2.7" />
 		<PackageReference Include="Aps.CommonBack.Base" Version="1.2.7.1" />
     <PackageReference Include="AWSSDK.Translate" Version="3.7.400.32" />
+    <PackageReference Include="Google.Apis.AndroidPublisher.v3" Version="1.70.0.3899" />
   </ItemGroup>
 
 	<ItemGroup>
@@ -59,6 +61,9 @@
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </Content>
 	  <Content Update="Data\firebase-stg.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Update="googleserviceaccount.json">
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </Content>
 	</ItemGroup>

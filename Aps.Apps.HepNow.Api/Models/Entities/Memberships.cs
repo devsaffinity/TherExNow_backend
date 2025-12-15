@@ -17,4 +17,15 @@ public class Memberships: EntityDef
 	public int UserId { get; set; }
 
 	public int PlanId { get; set; }
+
+	public MembershipProvider? Provider { get; set; }
+
+    [GraphQLIgnore]
+	public string AppleTransactionId { get; set; }
+
+    [GraphQLIgnore]
+    public string PurchaseToken { get; set; }
+
+    [GraphQLIgnore]
+    public bool IsMonthly { get; set; }
 }

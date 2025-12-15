@@ -252,6 +252,9 @@ namespace Aps.Apps.HepNow.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<string>("AppleTransactionId")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime(6)");
 
@@ -259,6 +262,9 @@ namespace Aps.Apps.HepNow.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsMonthly")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastModifiedDate")
@@ -269,6 +275,12 @@ namespace Aps.Apps.HepNow.Migrations
 
                     b.Property<int>("PlanId")
                         .HasColumnType("int");
+
+                    b.Property<int?>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PurchaseToken")
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime(6)");
@@ -796,6 +808,35 @@ namespace Aps.Apps.HepNow.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("Aps.Apps.HepNow.Models.Entities.WebhookLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Data")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Exception")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastModifiedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WebhookLog");
                 });
 
             modelBuilder.Entity("Aps.Apps.HepNow.Models.Entities.CustomizedExercise", b =>
