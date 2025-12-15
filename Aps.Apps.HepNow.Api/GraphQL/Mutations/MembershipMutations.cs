@@ -48,12 +48,13 @@ public class MembershipMutations: MutationBase<Memberships,MembershipInput,IMemb
     }
 
     [GraphQLName("membership_createSubscription")]
-    public async Task<ResponseBase<string>> CreateSubscription([Authentication] Authentication authentication, [Service] IMembershipService _membershipService, int planId, bool forYear)
+    public async Task<ResponseBase<string>> CreateSubscription([Authentication] Authentication authentication, [Service] IMembershipService _membershipService, bool forYear
+        , string successUrl, string cancelUrl)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
 
-        return await _membershipService.CreateSubscription(planId, authentication.CurrentUser, forYear);
+        return await _membershipService.CreateSubscription(authentication.CurrentUser, forYear, successUrl, cancelUrl);
     }
 
     [GraphQLName("membership_cancelSubscription")]
@@ -65,5 +66,23 @@ public class MembershipMutations: MutationBase<Memberships,MembershipInput,IMemb
         return await _membershipService.CancelSubscription(authentication.CurrentUser);
     }
 
+    [GraphQLName("membership_verifyReceiptApple")]
+    public async Task<ResponseBase<Memberships>> VerifyReceiptApple([Authentication] Authentication authentication, [Service] IMembershipService _membershipService, string base64Receipt, bool isSandbox)
+    {
+        if (authentication.Status != ResponseStatus.Success)
+            return authentication.Status;
+
+        return await _membershipService.VerifyReceiptApple(authentication.CurrentUser.Id, base64Receipt);
+    }
+
+    [GraphQLName("membership_verifyReceiptGoogle")]
+    public async Task<ResponseBase<Memberships>> VerifyReceiptGoogle([Authentication] Authentication authentication, [Service] IMembershipService _membershipService,
+        string packageName, string productId, string purchaseToken)
+    {
+        if (authentication.Status != ResponseStatus.Success)
+            return authentication.Status;
+
+        return await _membershipService.VerifyReceiptGoogle(authentication.CurrentUser.Id, packageName, productId, purchaseToken);
+    }
     #endregion
 }

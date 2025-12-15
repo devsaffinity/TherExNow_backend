@@ -14,24 +14,15 @@ public class RoutineMutations : MutationBase<Routines, RoutineInput, IRoutineSer
     public override ResponseBase Delete(ClaimsPrincipal claims, [Service] IRoutineService service, int entityId) => null;
 
     [GraphQLName("routine_createRoutine")]
-    public ResponseBase<Routines> Create([Authentication] Authentication authentication, [Service] IRoutineService service, RoutineInput input
+    public async Task<ResponseBase<Routines>> Create([Authentication] Authentication authentication, [Service] IRoutineService service, RoutineInput input
         , [Service] INotificationService notificationService
         , [Service] IMembershipService membershipService)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
 
-        if (!membershipService.CheckMaxTryFreePlan(authentication.CurrentUser.Id, OptionsForMaxTryFreePlan.Routine).Result)
-        {
-            if (notificationService.GetAll(a => a.UserId == authentication.CurrentUser.Id && a.NotificationType == NotificationType.MaxTryFreePlanForRoutine).Result.Count() == 0)
-                notificationService.Send(new NotificationInput
-                {
-                    UserId = authentication.CurrentUser.Id,
-                    NotificationType = NotificationType.MaxTryFreePlanForRoutine,
-                });
-
+        if (!await membershipService.CheckMaxTryFreePlan(authentication.CurrentUser.Id, NotificationType.MaxTryFreePlanForRoutine))
             return CustomResponseStatus.MaxTryFreePlanForRoutine;
-        }
 
         input.UserId = authentication.CurrentUser.Id;
         input.Name = input.Name.Trim();

@@ -3,7 +3,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:18021",
+      "applicationUrl": "http://localhost:18021/ui/altair",
       "sslPort": 44326
     }
   },

@@ -14,4 +14,7 @@ public class MembershipInput: InputDef
 	public int UserId { get; set; }
 
 	public int PlanId { get; set; }
+
+    [GraphQLIgnore]
+	public bool IsFree { get; set; }
 }
