@@ -142,17 +142,10 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<Users>.Failure(ResponseStatus.UserNotFound);
 
-        user.QrCodeCount = user.QrCodeCount + 1;
-        if (user.QrCodeCount >= 1 && membershipService.GetCurrentMembership(user.Id).Result?.PaymentAmount == 0 && notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForQrCode).Result.Count() == 0)
-        {
-            NotificationInput notificationInput = new()
-            {
-                NotificationType = NotificationType.MaxTryFreePlanForQrCode,
-                UserId = user.Id,
-            };
-            await notificationService.Send(notificationInput);
-        }
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForQrCode))
+            return CustomResponseStatus.MaxTryFreePlanForQrCode;
 
+        user.QrCodeCount++;
         return service.Update(user);
     }
 
@@ -163,17 +156,10 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<Users>.Failure(ResponseStatus.UserNotFound);
 
-        user.PrintCount = user.PrintCount + 1;
-        if (user.PrintCount >= 1 && membershipService.GetCurrentMembership(user.Id).Result?.PaymentAmount == 0 && notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForPrint).Result.Count() == 0)
-        {
-            NotificationInput notificationInput = new()
-            {
-                NotificationType = NotificationType.MaxTryFreePlanForPrint,
-                UserId = user.Id,
-            };
-            await notificationService.Send(notificationInput);
-        }
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForPrint))
+            return CustomResponseStatus.MaxTryFreePlanForPrint;
 
+        user.PrintCount++;
         return service.Update(user);
     }
 
@@ -184,17 +170,10 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<Users>.Failure(ResponseStatus.UserNotFound);
 
-        user.SentEmailCount = user.SentEmailCount + 1;
-        if (user.SentEmailCount >= 1 && membershipService.GetCurrentMembership(user.Id).Result?.PaymentAmount == 0 && notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForPrint).Result.Count() == 0)
-        {
-            NotificationInput notificationInput = new()
-            {
-                NotificationType = NotificationType.MaxTryFreePlanForEmail,
-                UserId = user.Id,
-            };
-            await notificationService.Send(notificationInput);
-        }
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForEmail))
+            return CustomResponseStatus.MaxTryFreePlanForEmail;
 
+        user.SentEmailCount++;
         return service.Update(user);
     }
 
@@ -205,17 +184,10 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<Users>.Failure(ResponseStatus.UserNotFound);
 
-        user.SentSmsCount = user.SentSmsCount + 1;
-        if (user.SentSmsCount >= 1 && membershipService.GetCurrentMembership(user.Id).Result?.PaymentAmount == 0 && notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForPrint).Result.Count() == 0)
-        {
-            NotificationInput notificationInput = new()
-            {
-                NotificationType = NotificationType.MaxTryFreePlanForSms,
-                UserId = user.Id,
-            };
-            await notificationService.Send(notificationInput);
-        }
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForSms))
+            return CustomResponseStatus.MaxTryFreePlanForSms;
 
+        user.SentSmsCount ++;
         return service.Update(user);
     }
 
@@ -241,17 +213,8 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UserNotFound);
 
-        if (!membershipService.CheckMaxTryFreePlan(user.Id, OptionsForMaxTryFreePlan.Email).Result)
-        {
-            if (notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForEmail).Result.Count() == 0)
-                _ = notificationService.Send(new NotificationInput
-                {
-                    UserId = user.Id,
-                    NotificationType = NotificationType.MaxTryFreePlanForEmail,
-                });
-
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForEmail))
             return ResponseBase<ResponseStatus>.Failure(CustomResponseStatus.MaxTryFreePlanForEmail);
-        }
 
         return await service.SendEmailByAmazonSesAsync(input, user.Id);
     }
@@ -263,7 +226,7 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
     }
 
     [GraphQLName("user_sendSms")]
-    public ResponseBase<ResponseStatus> SendSms(ClaimsPrincipal claims, [Service] IUserService service, SmsInput input
+    public async Task<ResponseBase<ResponseStatus>> SendSms(ClaimsPrincipal claims, [Service] IUserService service, SmsInput input
         , [Service] INotificationService notificationService
         , [Service] IMembershipService membershipService)
     {
@@ -271,17 +234,8 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
         if (user == null) return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UserNotFound);
 
-        if (!membershipService.CheckMaxTryFreePlan(user.Id, OptionsForMaxTryFreePlan.Sms).Result)
-        {
-            if (notificationService.GetAll(a => a.UserId == user.Id && a.NotificationType == NotificationType.MaxTryFreePlanForSms).Result.Count() == 0)
-                notificationService.Send(new NotificationInput
-                {
-                    UserId = user.Id,
-                    NotificationType = NotificationType.MaxTryFreePlanForSms,
-                });
-
+        if (!await membershipService.CheckMaxTryFreePlan(user.Id, NotificationType.MaxTryFreePlanForSms))
             return ResponseBase<ResponseStatus>.Failure(CustomResponseStatus.MaxTryFreePlanForSms);
-        }
 
         return service.SendSms(input, user.Id);
     }
