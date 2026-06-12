@@ -17,19 +17,14 @@ app.UseSwaggerUI(c =>
 app.UseGraphQLAltair();
 app.UseCors("AllowAllOrigins");
 app.UseWebSockets();
+app.UseRouting();
 app.UseAuthentication();
 app.UseMiddleware<AuthMiddleware>();
-
-app.UseRouting()
-    .UseEndpoints(endpoint =>
-    {
-        endpoint.MapGraphQL();
-    });
-
 app.UseAuthorization();
 
 app.UseEndpoints(endpoints =>
 {
+    endpoints.MapGraphQL();
     //endpoints.MapControllers();
     endpoints.MapControllerRoute(
         name: "default",
