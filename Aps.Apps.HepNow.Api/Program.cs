@@ -17,6 +17,7 @@ if (!isProd)
     });
 }
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseGraphQLAltair();
 app.UseWebSockets();
 app.UseRouting();
@@ -25,12 +26,9 @@ app.UseAuthentication();
 app.UseMiddleware<AuthMiddleware>();
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapGraphQL();
-    endpoints.MapControllerRoute(
-        name: "default",
-        pattern: "{controller}/{action}/{id?}");
-});
+app.MapGraphQL();
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller}/{action}/{id?}");
 
 app.Run();

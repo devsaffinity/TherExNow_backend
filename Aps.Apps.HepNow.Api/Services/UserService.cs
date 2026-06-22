@@ -12,13 +12,14 @@ namespace Aps.Apps.HepNow.Services;
 
 public class UserService : UserServiceBase<Users, UserInput>, IUserService
 {
-    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService) : base(repository)
+    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService, ILogger<UserService> logger) : base(repository)
     {
         this.repository = repository;
         this.sendGridConfig = sendGridConfig;
         this.twilioConfig = twilioConfig;
         this.firebaseAppCreator = firebaseAppCreator;
         _emailService = emailService;
+        _logger = logger;
     }
 
     #region props
@@ -27,12 +28,13 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
     private readonly IOptions<TwilioConfig> twilioConfig;
     private readonly FirebaseAppCreator firebaseAppCreator;
     private readonly IEmailService _emailService;
+    private readonly ILogger<UserService> _logger;
     #endregion
 
     #region functions
 
 
-    public override ResponseBase<Users> SignUp(string externalId, string? email, UserInput userInput)
+    public override ResponseBase<Users> SignUp(string externalId, string email, UserInput userInput)
     {
         var user = repository.Where(a => a.ExternalId == externalId || a.ExternalId2 == externalId || (!string.IsNullOrEmpty(userInput.Email) && a.Email == userInput.Email)).IgnoreQueryFilters().FirstOrDefault();
         if (user == null)
@@ -67,6 +69,7 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to delete Firebase user for local user {UserId}", entityId);
         }
 
         return ResponseStatus.Success;
@@ -107,6 +110,7 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to send email to {To} for user {UserId}", emailInput.To, userId);
             return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UnknownError);
         }
     }
@@ -146,8 +150,9 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
                 return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UnknownError);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to send email via Amazon SES to {To} for user {UserId}", emailInput.To, userId);
             return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UnknownError);
         }
     }
@@ -182,6 +187,7 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         }
         catch (Exception e)
         {
+            _logger.LogError(e, "Failed to send SMS to {PhoneNumber} for user {UserId}", smsInput.PhoneNumber, userId);
         }
 
         return ResponseBase<ResponseStatus>.Failure(ResponseStatus.UnknownError);

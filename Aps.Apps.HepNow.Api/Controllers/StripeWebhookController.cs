@@ -7,6 +7,13 @@ namespace Aps.Apps.HepNow.Controllers
     [Route("api/[controller]")]
     public class StripeWebhookController : ControllerBase
     {
+        private readonly ILogger<StripeWebhookController> _logger;
+
+        public StripeWebhookController(ILogger<StripeWebhookController> logger)
+        {
+            _logger = logger;
+        }
+
         [HttpPost]
         public async Task<IActionResult> Post([FromServices] IConfiguration configuration, [FromServices]IMembershipRepository membershipRepository
             , [FromServices] IUserRepository userRepository, [FromServices] IWebhookLogRepository webhookLogRepository)
@@ -84,11 +91,11 @@ namespace Aps.Apps.HepNow.Controllers
                             UserId = userId,
                         });
 
-                        Console.WriteLine("Invoice paid (renewal succeeded).");
+                        _logger.LogInformation("Stripe invoice paid (renewal succeeded) for user {UserId}", userId);
                         break;
 
                     case EventTypes.InvoicePaymentFailed:
-                        Console.WriteLine("Invoice payment failed (renewal failed).");
+                        _logger.LogWarning("Stripe invoice payment failed (renewal failed)");
                         break;
                 }
 
@@ -97,8 +104,8 @@ namespace Aps.Apps.HepNow.Controllers
             }
             catch (StripeException e)
             {
-                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = json, Exception = e.Message + 
-                    Environment.NewLine + e.StackTrace});
+                _logger.LogError(e, "Error handling Stripe webhook");
+                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = json, Exception = e.Message });
                 return BadRequest();
             }
         }

@@ -10,6 +10,8 @@ namespace Aps.Apps.HepNow.GraphQL
             IRequestExecutor requestExecutor, IQueryRequestBuilder requestBuilder,
             CancellationToken cancellationToken)
         {
+            var logger = context.RequestServices.GetRequiredService<ILogger<HttpRequestInterceptor>>();
+
             if (context.User is not null && context.User.Identity.IsAuthenticated)
             {
                 var externalId = context.User.FindFirstValue("user_id");
@@ -19,14 +21,17 @@ namespace Aps.Apps.HepNow.GraphQL
                 var dbContext = contextFactory.CreateDbContext();
                 var currentUser = dbContext.Set<Users>().SingleOrDefault(a => a.ExternalId == externalId || a.ExternalId2 == externalId);
 
-                requestBuilder.SetProperty("Authentication", new Authentication(context.User, currentUser));
+                if (currentUser is null)
+                    logger.LogWarning("Authenticated GraphQL request with no matching local user for external id {ExternalId}", externalId);
+
+                requestBuilder.SetGlobalState("Authentication", new Authentication(context.User, currentUser));
             }
             else
             {
-                requestBuilder.SetProperty("Authentication", new Authentication(context.User, null));
+                requestBuilder.SetGlobalState("Authentication", new Authentication(context.User, null));
             }
 
-            requestBuilder.SetProperty("HttpContext", context);
+            requestBuilder.SetGlobalState("HttpContext", context);
 
             return base.OnCreateAsync(context, requestExecutor, requestBuilder, cancellationToken);
         }

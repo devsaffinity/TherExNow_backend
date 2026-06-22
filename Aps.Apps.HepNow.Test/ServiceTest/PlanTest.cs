@@ -10,8 +10,8 @@
         }
 
         [Theory]
-        [InlineData("unique plan name for create", "description", 1, "{ 'allowShare' : true}", 10)]
-        public void Create(string title, string description, int month, string features, decimal price)
+        [InlineData("unique plan name for create", "description", "{ 'allowShare' : true}", 10)]
+        public void Create(string title, string description, string features, decimal price)
         {
             var input = new PlanInput
             {
@@ -32,8 +32,8 @@
         }
 
         [Theory]
-        [InlineData("unique plan name for update", "description", 1, "{ 'allowShare' : true}", 10)]
-        public void Update(string title, string description, int month, string features, decimal price)
+        [InlineData("unique plan name for update", "description", "{ 'allowShare' : true}", 10)]
+        public void Update(string title, string description, string features, decimal price)
         {
             var plan = new Plans { Title = Guid.NewGuid().ToString() };
             var response = planService.Add(plan);

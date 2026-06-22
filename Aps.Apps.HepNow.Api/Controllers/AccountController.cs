@@ -9,11 +9,13 @@ namespace Aps.Apps.HepNow.Controllers
     {
         private readonly IConfiguration configuration;
         private readonly IAuthService authService;
+        private readonly ILogger<AccountController> logger;
 
-        public AccountController(IConfiguration configuration, IAuthService authService)
+        public AccountController(IConfiguration configuration, IAuthService authService, ILogger<AccountController> logger)
         {
             this.configuration = configuration;
             this.authService = authService;
+            this.logger = logger;
         }
 
         [HttpPost("email-login")]
@@ -26,8 +28,9 @@ namespace Aps.Apps.HepNow.Controllers
                 var authToken = await authService.EmailLogin(authConfig, email, password);
                 return authToken;
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogWarning(ex, "Email login failed for {Email}", email);
                 return NotFound("User Not Found");
             }
         }

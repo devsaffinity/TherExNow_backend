@@ -39,3 +39,9 @@ dotnet_naming_style.camel_case_style.capitalization = camel_case
 # analyzers, so don't fail the build over pre-existing style.
 dotnet_diagnostic.IDE0011.severity = suggestion
 csharp_new_line_before_open_brace = all
+
+[Aps.Apps.HepNow.Test/**.cs]
+# Xunit.DependencyInjection resolves these constructor params via DI, not xUnit
+# fixtures - xUnit1041 doesn't recognize that pattern and false-positives on every
+# test class here.
+dotnet_diagnostic.xUnit1041.severity = none

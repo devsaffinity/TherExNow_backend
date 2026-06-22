@@ -1,24 +1,28 @@
 ﻿using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aps.Apps.HepNow.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class UploadController : ControllerBase
     {
         private readonly string _bucketName;
         private readonly IAmazonS3 _s3Client;
+        private readonly ILogger<UploadController> _logger;
         private const double TimeoutDuration = 12;
 
-        public UploadController(IConfiguration configuration)
+        public UploadController(IConfiguration configuration, ILogger<UploadController> logger)
         {
             _bucketName = configuration["S3Credentials:BucketName"];
             var accessKey = configuration["S3Credentials:AccessKey"];
             var secretKey = configuration["S3Credentials:SecretKey"];
             _s3Client = new AmazonS3Client(accessKey, secretKey, RegionEndpoint.USWest1);
+            _logger = logger;
         }
 
         [HttpPost("GetPresignedUrls")]
@@ -51,7 +55,8 @@ namespace Aps.Apps.HepNow.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest($"Internal server error: {ex.Message}");
+                _logger.LogError(ex, "Error generating presigned upload URLs");
+                return BadRequest("Internal server error.");
             }
         }
 
@@ -75,7 +80,7 @@ namespace Aps.Apps.HepNow.Controllers
             }
             catch (AmazonS3Exception ex)
             {
-                Console.WriteLine($"Error: '{ex.Message}'");
+                _logger.LogError(ex, "Error generating presigned URL for {ObjectKey} part {ChunkNumber}", objectKey, chunkNumber);
                 throw;
             }
         }
