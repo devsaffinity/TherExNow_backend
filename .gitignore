@@ -361,3 +361,18 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ----------------------------------------------------------------------------
+# Local secrets / environment overrides - never commit real credentials
+# ----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Per-developer local config overrides (appsettings.json itself stays tracked
+# as a placeholder template - see .env.example)
+appsettings.local.json
+appsettings.*.local.json
+appsettings.Production.json
+appsettings.Development.json
+appsettings.Staging.json

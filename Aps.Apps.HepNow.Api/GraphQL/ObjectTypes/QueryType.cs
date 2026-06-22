@@ -33,7 +33,7 @@ public class QueryType : ObjectType<Query>
         }
     }
 
-    private NameString GetMethodName(string entityName, MethodTypes methodType)
+    private string GetMethodName(string entityName, MethodTypes methodType)
     {
         if (methodType == MethodTypes.Get)
         {

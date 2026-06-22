@@ -33,7 +33,7 @@ public class MutationType : ObjectType<Mutation>
         }
     }
 
-    private NameString GetMethodName(string entityName, MethodTypes methodType)
+    private string GetMethodName(string entityName, MethodTypes methodType)
     {
         string simpleName = entityName.FirstCharToLower();
         if (methodType == MethodTypes.Update)

@@ -9,7 +9,7 @@ namespace Aps.Apps.HepNow.Api.GraphQL.Subscriptions
         public ValueTask<ISourceStream<Notification>> SubscribeToNotificationAdded(int userId, [Service] ITopicEventReceiver receiver)
         {
             string topic = $"{userId}_NotificationAdded";
-            var stream = receiver.SubscribeAsync<string, Notification>(topic);
+            var stream = receiver.SubscribeAsync<Notification>(topic);
             return stream;
         }
 

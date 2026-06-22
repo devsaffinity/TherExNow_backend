@@ -18,10 +18,27 @@ public static class IServiceExtensions
 
     public static void AddServices(this IServiceCollection services, IConfiguration configuration)
     {
+        var env = configuration["env"];
+        var allowedOrigins = configuration.GetSection("AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+
         services.AddCors(options => options.AddPolicy("AllowAllOrigins", builder =>
-            builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader()));
+        {
+            // dev/qa (or no AllowedOrigins configured yet for stg/prd): keep current
+            // wide-open behavior so nothing breaks. Once AllowedOrigins is populated
+            // in stg/prd config, this policy automatically locks down to that list.
+            if (env == "dev" || env == "qa" || allowedOrigins.Length == 0)
+            {
+                builder.AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            }
+            else
+            {
+                builder.WithOrigins(allowedOrigins)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            }
+        }));
 
 
         var projectName = configuration["ProjectName"];
@@ -63,27 +80,25 @@ public static class IServiceExtensions
         services.AddSwaggerGen(s => s.SchemaFilter<SwaggerIgnoreFilter>());
 
         string connectionString = configuration.GetConnectionString("DbConnection");
-        services.AddPooledDbContextFactory<DataContext>(options => options
-            .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
-            .UseLoggerFactory(new LoggerFactory(new[] { new DebugLoggerProvider() }))
-                .EnableSensitiveDataLogging());
+        services.AddPooledDbContextFactory<DataContext>(options =>
+        {
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+
+            // Sensitive data logging echoes real parameter values (PII, tokens) into
+            // the log stream - dev-only, never stg/prd.
+            if (env == "dev")
+            {
+                options.UseLoggerFactory(new LoggerFactory(new[] { new DebugLoggerProvider() }))
+                    .EnableSensitiveDataLogging();
+            }
+        });
 
         #region RegisterServices
         AddRepositoryAndService(services);
 
         var graphql = services.AddGraphQLServer()
             .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = configuration["env"] != "prd")
-            .AddErrorFilter(e =>
-            {
-                //for debug only
-                Console.WriteLine(e.Exception);
-                return e;
-            })
-            .OnSchemaError((descriptorContext, exception) =>
-            {
-                //for debug only
-                Console.WriteLine(exception);
-            })
+            .AddErrorFilter<GraphQLErrorFilter>()
             .AddHttpRequestInterceptor<HttpRequestInterceptor>()
             .AddQueryType<QueryType>()
             .AddMutationType<MutationType>()
