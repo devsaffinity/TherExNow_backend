@@ -29,7 +29,7 @@ public class RoutineService : ServiceBase<Routines, RoutineInput>, IRoutineServi
         routine.Name = input.Name;
         routine.Description = input.Description;
         routine.FileUrl = input.FileUrl;
-        repository.Update(routine);
+        repository.Update(routine, saveNow: false);
 
         if (input.RoutineExercises != null)
         {
@@ -47,7 +47,7 @@ public class RoutineService : ServiceBase<Routines, RoutineInput>, IRoutineServi
             {
                 var entity = routineExerciseRepository.GetById(routineExercise.Id.Value);
                 routineExercise.Adapt(entity);
-                routineExerciseRepository.Update(entity);
+                routineExerciseRepository.Update(entity, saveNow: false);
             }
 
             //Create RoutineExercise
@@ -55,9 +55,14 @@ public class RoutineService : ServiceBase<Routines, RoutineInput>, IRoutineServi
             {
                 var entity = routineExercise.Adapt<RoutineExercises>();
                 entity.RoutineId = input.Id.Value;
-                routineExerciseRepository.Add(entity);
+                routineExerciseRepository.Add(entity, saveNow: false);
             }
         }
+
+        // Update/Create above deferred their save (saveNow: false); committing once here groups
+        // them into a single write instead of one round-trip per row.
+        routineExerciseRepository.SaveChanges(routineExerciseRepository.GetDbContext());
+        repository.SaveChanges(repository.GetDbContext());
 
         return ResponseBase<Routines>.Success(repository.Where(a => a.Id == input.Id).Include(a => a.RoutineExercises).FirstOrDefault()); ;
     }
