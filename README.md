@@ -33,7 +33,7 @@ Aps.Apps.HepNow.sln
 | **.NET SDK** | **.NET 8.0** (project targets `net8.0`, current LTS). A `global.json` at the repo root pins the SDK feature band so `dotnet` resolves the right version even with other SDKs installed. The **ASP.NET Core 8.0 runtime** is required, not just the .NET 8 runtime — `Microsoft.NET.Sdk.Web` apps need it to run. |
 | **MySQL** | 8.x (or any MySQL-compatible server). The app calls `Database.Migrate()` on startup, so the database itself does not need to exist beforehand — only the server/credentials do. |
 | **Firebase project** | A Firebase project with Authentication enabled, plus a **service account JSON key** for the Admin SDK. |
-| **Private NuGet feed** | The project depends on private packages `Aps.CommonBack.Auth`, `Aps.CommonBack.Base`, and `Apsy.Common.Api.Auth`. These are **not** on nuget.org — you need access to the team's private package source (see [azure-pipelines.yml](azure-pipelines.yml), which restores from an Azure DevOps Artifacts feed). Add that feed to your NuGet config, or place the `.nupkg`/built DLLs in a local folder and register it as a package source. These packages currently target `net5.0`; they're forward-compatible as dependencies of a `net8.0` app, but can't be upgraded from this repo. |
+| **Private NuGet feed** | The project depends on private packages `Aps.CommonBack.Auth`, `Aps.CommonBack.Base`, and `Apsy.Common.Api.Auth`. These are **not** on nuget.org — you need access to the team's private package source (an Azure DevOps Artifacts feed). Add that feed to your NuGet config, or place the `.nupkg`/built DLLs in a local folder and register it as a package source. These packages currently target `net5.0`; they're forward-compatible as dependencies of a `net8.0` app, but can't be upgraded from this repo. |
 | **EF Core tools** (optional, for managing migrations) | `dotnet tool install --global dotnet-ef --version 8.*` |
 
 ### Installing the .NET 8 SDK + ASP.NET Core runtime
@@ -209,10 +209,9 @@ ASPNETCORE_ENVIRONMENT=Production dotnet ./publish/Aps.Apps.HepNow.dll
 - `app.UseWebSockets()` is enabled for GraphQL subscriptions — make sure your
   reverse proxy is configured to allow WebSocket upgrades on the `/graphql`
   path.
-- The existing CI pipelines (`azure-pipelines.yml`, `azure-pipelines-1.yml`)
-  target a **Windows** build agent and use `MSBuild`/`VSBuild` tasks oriented
-  at IIS/Azure App Service deployment. If moving to a Linux host, replace
-  these with a `dotnet publish` + container or systemd-based pipeline.
+- No CI pipeline is currently checked into this repo. Set one up with a
+  `dotnet publish` + container or systemd-based deployment step as
+  appropriate for your hosting target.
 
 ### Database migrations in production
 
