@@ -9,53 +9,68 @@ namespace Aps.Apps.HepNow.Controllers
     [Route("api/[controller]")]
     public class GoogleWebhookController : ControllerBase
     {
+        private readonly ILogger<GoogleWebhookController> _logger;
+
+        public GoogleWebhookController(ILogger<GoogleWebhookController> logger)
+        {
+            _logger = logger;
+        }
+
         [HttpPost]
         public IActionResult Post([FromBody] JsonElement pubSubMessage, [FromServices] IMembershipRepository repository, [FromServices] IPlanRepository planRepository
             , [FromServices] IWebhookLogRepository webhookLogRepository)
         {
-            var messageBase64 = pubSubMessage.GetProperty("message").GetProperty("data").GetString();
-            var messageJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(messageBase64));
-            var notification = System.Text.Json.JsonSerializer.Deserialize<GoogleNotification>(messageJson);
-
-            webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Google, Data = messageJson });
-            switch (notification.SubscriptionNotification?.NotificationType)
+            try
             {
-                case 1: // SUBSCRIPTION_RECOVERED
-                case 2: // SUBSCRIPTION_RENEWED
-                //case 4: //SUBSCRIPTION_PURCHASED
-                    var lastMembership = repository.Where(a => a.PurchaseToken == notification.SubscriptionNotification.PurchaseToken).OrderByDescending(a => a.Id).FirstOrDefault();
+                var messageBase64 = pubSubMessage.GetProperty("message").GetProperty("data").GetString();
+                var messageJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(messageBase64));
+                var notification = System.Text.Json.JsonSerializer.Deserialize<GoogleNotification>(messageJson);
 
-                    if (lastMembership != null)
-                    {
-                        if (lastMembership.EndDate > DateTime.UtcNow)
+                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Google, Data = messageJson });
+                switch (notification.SubscriptionNotification?.NotificationType)
+                {
+                    case 1: // SUBSCRIPTION_RECOVERED
+                    case 2: // SUBSCRIPTION_RENEWED
+                    //case 4: //SUBSCRIPTION_PURCHASED
+                        var lastMembership = repository.Where(a => a.PurchaseToken == notification.SubscriptionNotification.PurchaseToken).OrderByDescending(a => a.Id).FirstOrDefault();
+
+                        if (lastMembership != null)
+                        {
+                            if (lastMembership.EndDate > DateTime.UtcNow)
+                            {
+                                lastMembership.EndDate = DateTime.UtcNow;
+                                repository.Update(lastMembership);
+                            }
+
+                            repository.Add(new Memberships
+                            {
+                                Provider = MembershipProvider.Google,
+                                StartDate = DateTime.UtcNow,
+                                EndDate = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(notification.SubscriptionNotification.ExpiryTimeMillis)).UtcDateTime,
+                                UserId = lastMembership.UserId,
+                                PaymentAmount = lastMembership.PaymentAmount,
+                                PlanId = planRepository.Where(a => a.PriceMonth > 0 || a.PriceYear > 0).Select(a => a.Id).FirstOrDefault(),
+                            });
+                        }
+                        break;
+                    case 3: // SUBSCRIPTION_CANCELED
+                        lastMembership = repository.Where(a => a.PurchaseToken == notification.SubscriptionNotification.PurchaseToken && a.EndDate > DateTime.UtcNow).OrderByDescending(a => a.Id).FirstOrDefault();
+
+                        if (lastMembership != null)
                         {
                             lastMembership.EndDate = DateTime.UtcNow;
                             repository.Update(lastMembership);
                         }
+                        break;
+                }
 
-                        repository.Add(new Memberships
-                        {
-                            Provider = MembershipProvider.Google,
-                            StartDate = DateTime.UtcNow,
-                            EndDate = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(notification.SubscriptionNotification.ExpiryTimeMillis)).UtcDateTime,
-                            UserId = lastMembership.UserId,
-                            PaymentAmount = lastMembership.PaymentAmount,
-                            PlanId = planRepository.Where(a => a.PriceMonth > 0 || a.PriceYear > 0).Select(a => a.Id).FirstOrDefault(),
-                        });
-                    }
-                    break;
-                case 3: // SUBSCRIPTION_CANCELED
-                    lastMembership = repository.Where(a => a.PurchaseToken == notification.SubscriptionNotification.PurchaseToken && a.EndDate > DateTime.UtcNow).OrderByDescending(a => a.Id).FirstOrDefault();
-
-                    if (lastMembership != null)
-                    {
-                        lastMembership.EndDate = DateTime.UtcNow;
-                        repository.Update(lastMembership);
-                    }
-                    break;
+                return Ok();
             }
-
-            return Ok();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling Google webhook");
+                return BadRequest();
+            }
         }
     }
 

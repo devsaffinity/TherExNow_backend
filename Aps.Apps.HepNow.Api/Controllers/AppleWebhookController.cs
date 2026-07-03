@@ -9,6 +9,13 @@ namespace Aps.Apps.HepNow.Controllers
     [Route("api/[controller]")]
     public class AppleWebhookController : ControllerBase
     {
+        private readonly ILogger<AppleWebhookController> _logger;
+
+        public AppleWebhookController(ILogger<AppleWebhookController> logger)
+        {
+            _logger = logger;
+        }
+
         [HttpPost]
         public IActionResult Post([FromBody] AppleNotificationRequest request, [FromServices]IMembershipRepository repository, [FromServices] IPlanRepository planRepository
             , [FromServices] IWebhookLogRepository webhookLogRepository)
@@ -82,8 +89,8 @@ namespace Aps.Apps.HepNow.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error handling Apple webhook: {ex}");
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error handling Apple webhook");
+                return BadRequest();
             }
         }
     }
