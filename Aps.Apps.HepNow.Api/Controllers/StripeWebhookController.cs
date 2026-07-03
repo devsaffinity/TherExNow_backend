@@ -29,9 +29,21 @@ namespace Aps.Apps.HepNow.Controllers
                     endpointSecret
                 );
 
+                // Stripe redelivers events on retry; skip if we've already processed this exact event.
+                if (webhookLogRepository.Any(a => a.EventId == stripeEvent.Id))
+                {
+                    _logger.LogInformation("Stripe webhook event {EventId} already processed, skipping", stripeEvent.Id);
+                    return Ok();
+                }
+
                 switch (stripeEvent.Type)
                 {
-                    /*case EventTypes.CheckoutSessionCompleted:
+                    /* Intentionally left disabled: invoice.paid (below) already creates the membership
+                     * for a new subscription's first invoice, so wiring this up too would create a
+                     * second, duplicate membership for every new subscriber. Re-enabling this needs a
+                     * decision on which event should own membership creation, tested against Stripe
+                     * before going live.
+                    case EventTypes.CheckoutSessionCompleted:
                         var session = stripeEvent.Data.Object as Stripe.Checkout.Session;
                         var userId = int.Parse(session.Metadata.GetValueOrDefault("userId"));
                         var planId = int.Parse(session.Metadata.GetValueOrDefault("planId"));
@@ -47,7 +59,7 @@ namespace Aps.Apps.HepNow.Controllers
                                 membershipRepository.Update(lastMembership);
                             }
                         }
-                        
+
                         membershipRepository.Add(new Memberships
                         {
                             Provider = MembershipProvider.Stripe,
@@ -63,12 +75,44 @@ namespace Aps.Apps.HepNow.Controllers
                         var subscription = stripeEvent.Data.Object as Stripe.Subscription;
                         break;
 
+                    case EventTypes.CustomerSubscriptionDeleted:
+                    case EventTypes.CustomerSubscriptionUpdated:
+                        {
+                            var sub = (Stripe.Subscription)stripeEvent.Data.Object;
+                            var isCanceled = sub.Status == "canceled" || sub.CancelAtPeriodEnd;
+                            if (!isCanceled)
+                                break;
+
+                            var userIdForSub = userRepository.Where(a => a.StripeCustomerId == sub.CustomerId).Select(a => a.Id).FirstOrDefault();
+                            if (userIdForSub == 0)
+                            {
+                                _logger.LogWarning("Stripe subscription {EventType} referenced unknown customer {CustomerId}", stripeEvent.Type, sub.CustomerId);
+                                break;
+                            }
+
+                            var activeMembership = membershipRepository.Where(a => a.UserId == userIdForSub && a.EndDate > DateTime.UtcNow)
+                                .OrderByDescending(a => a.Id).FirstOrDefault();
+                            if (activeMembership != null)
+                            {
+                                activeMembership.EndDate = DateTime.UtcNow;
+                                membershipRepository.Update(activeMembership);
+                                _logger.LogInformation("Stripe subscription cancelled for user {UserId}", userIdForSub);
+                            }
+                            break;
+                        }
+
                     case EventTypes.InvoicePaid:
                         var invoice = (Invoice)stripeEvent.Data.Object;
                         if (!(invoice.BillingReason == "subscription_create" || invoice.BillingReason == "subscription_cycle"))
                             break;
 
                         var userId = userRepository.Where(a => a.StripeCustomerId == invoice.CustomerId).Select(a => a.Id).FirstOrDefault();
+
+                        if (userId == 0)
+                        {
+                            _logger.LogWarning("Stripe invoice.paid referenced unknown customer {CustomerId}, skipping membership update", invoice.CustomerId);
+                            break;
+                        }
 
                         var lastMembership = membershipRepository.Where(a => a.UserId == userId).OrderByDescending(a => a.Id).FirstOrDefault();
                         if (lastMembership != null)
@@ -99,7 +143,7 @@ namespace Aps.Apps.HepNow.Controllers
                         break;
                 }
 
-                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = json });
+                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = json, EventId = stripeEvent.Id });
                 return Ok();
             }
             catch (StripeException e)
