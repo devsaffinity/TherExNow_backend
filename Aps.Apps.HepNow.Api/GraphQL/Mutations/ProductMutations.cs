@@ -8,7 +8,7 @@ public class ProductMutations : MutationBase<Products, ProductInput, IProductSer
 
     #region functions
     [GraphQLName("product_createProduct")]
-    public ResponseBase<Products> Create([Authentication] Authentication authentication, [Service] IProductService service, ProductInput input)
+    public ResponseBase<Products> Create([Authentication] Authentication authentication, [Service] IProductService service, [Service] ILogger<ProductMutations> logger, ProductInput input)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
@@ -18,14 +18,14 @@ public class ProductMutations : MutationBase<Products, ProductInput, IProductSer
 
         input.Name = input.Name.Trim();
 
-        /*if (service.Any(a => a.Name == input.Name).Status == ResponseStatus.Success)
-            return CustomResponseStatus.DuplicateName;*/
+        if (service.Any(a => a.Name == input.Name).Status == ResponseStatus.Success)
+            logger.LogWarning("Product created with a duplicate name: {Name}", input.Name);
 
         return service.Add(input);
     }
 
     [GraphQLName("product_updateProduct")]
-    public ResponseBase<Products> Update([Authentication] Authentication authentication, [Service] IProductService service, ProductInput input)
+    public ResponseBase<Products> Update([Authentication] Authentication authentication, [Service] IProductService service, [Service] ILogger<ProductMutations> logger, ProductInput input)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
@@ -36,8 +36,8 @@ public class ProductMutations : MutationBase<Products, ProductInput, IProductSer
         if (!string.IsNullOrEmpty(input.Name))
         {
             input.Name = input.Name.Trim();
-            /*if (service.Any(a => a.Name == input.Name && a.Id != input.Id).Status == ResponseStatus.Success)
-                return CustomResponseStatus.DuplicateName;*/
+            if (service.Any(a => a.Name == input.Name && a.Id != input.Id).Status == ResponseStatus.Success)
+                logger.LogWarning("Product updated to a duplicate name: {Name}", input.Name);
         }
 
         return service.Update(input);

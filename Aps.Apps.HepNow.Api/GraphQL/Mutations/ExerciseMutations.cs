@@ -7,7 +7,7 @@ public class ExerciseMutations: MutationBase<Exercises,ExerciseInput,IExerciseSe
 {
     #region functions
     [GraphQLName("exercise_createExercise")]
-    public ResponseBase<Exercises> Create([Authentication] Authentication authentication, [Service] IExerciseService service, ExerciseInput input)
+    public ResponseBase<Exercises> Create([Authentication] Authentication authentication, [Service] IExerciseService service, [Service] ILogger<ExerciseMutations> logger, ExerciseInput input)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
@@ -17,14 +17,14 @@ public class ExerciseMutations: MutationBase<Exercises,ExerciseInput,IExerciseSe
 
         input.Name = input.Name.Trim();
 
-        /*if (service.Any(a => a.Name == input.Name).Status == ResponseStatus.Success)
-            return CustomResponseStatus.DuplicateName;*/
+        if (service.Any(a => a.Name == input.Name).Status == ResponseStatus.Success)
+            logger.LogWarning("Exercise created with a duplicate name: {Name}", input.Name);
 
         return service.Add(input);
     }
 
     [GraphQLName("exercise_updateExercise")]
-    public ResponseBase<Exercises> Update([Authentication] Authentication authentication, [Service] IExerciseService service, ExerciseInput input)
+    public ResponseBase<Exercises> Update([Authentication] Authentication authentication, [Service] IExerciseService service, [Service] ILogger<ExerciseMutations> logger, ExerciseInput input)
     {
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
@@ -35,8 +35,8 @@ public class ExerciseMutations: MutationBase<Exercises,ExerciseInput,IExerciseSe
         if (!string.IsNullOrEmpty(input.Name))
         {
             input.Name = input.Name.Trim();
-            /*if (service.Any(a => a.Name == input.Name && a.Id != input.Id).Status == ResponseStatus.Success)
-                return CustomResponseStatus.DuplicateName;*/
+            if (service.Any(a => a.Name == input.Name && a.Id != input.Id).Status == ResponseStatus.Success)
+                logger.LogWarning("Exercise updated to a duplicate name: {Name}", input.Name);
         }
 
         return service.Update(input);
