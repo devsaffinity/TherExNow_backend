@@ -5,5 +5,6 @@
         public MembershipProvider Provider { get; set; }
         public string Data { get; set; }
         public string Exception { get; set; }
+        public string EventId { get; set; }
     }
 }

@@ -16,7 +16,7 @@ namespace Aps.Apps.HepNow.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "6.0.29")
+                .HasAnnotation("ProductVersion", "8.0.28")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             modelBuilder.Entity("Aps.Apps.HepNow.Models.Entities.AppSettings", b =>
@@ -820,6 +820,9 @@ namespace Aps.Apps.HepNow.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("Data")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("EventId")
                         .HasColumnType("longtext");
 
                     b.Property<string>("Exception")
