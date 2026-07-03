@@ -175,43 +175,60 @@ dotnet ef database update
 
 ## Build & Deployment
 
+This app is hosted on **AWS Elastic Beanstalk**, using the **.NET 8 running
+on 64-bit Amazon Linux 2023** managed platform (EB provisions and manages the
+ASP.NET Core runtime itself — no manual runtime install needed).
+
 ### Building for production
 
 ```bash
 dotnet publish Aps.Apps.HepNow.Api/Aps.Apps.HepNow.csproj -c Release -o ./publish
 ```
 
-This produces a framework-dependent deployment in `./publish`. Run it with:
+This produces a framework-dependent deployment in `./publish`. To run it
+outside of Elastic Beanstalk (e.g. for local verification of a production
+build):
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Production dotnet ./publish/Aps.Apps.HepNow.dll
 ```
 
-### Deployment notes (Linux hosting)
+### Deploying to Elastic Beanstalk
 
-- The target server needs the **ASP.NET Core 8.0 runtime** installed (or
-  publish a **self-contained** build with `-p:SelfContained=true -r
-  linux-x64` to bundle the runtime).
+Deploy with the [EB CLI](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/eb-cli3.html)
+from the `Aps.Apps.HepNow.Api` directory:
+
+```bash
+cd Aps.Apps.HepNow.Api
+eb init                 # one-time: select the apsy-therexnow application / region
+eb deploy <environment> # e.g. apsy-therexnow-dev
+```
+
+`eb init`/`eb deploy` read from a local `.elasticbeanstalk/config.yml`, which
+is **not** committed (it's per-developer EB CLI state, gitignored) — each
+developer or CI runner needs to run `eb init` once to generate it, pointing
+at the shared `apsy-therexnow` application.
+
 - Set `ASPNETCORE_ENVIRONMENT=Production` **and** `env=prd` (the app-level
-  logical environment name — see Configuration Reference below) and supply
-  all variables from `.env.example` via your hosting platform's
-  environment/secrets mechanism (systemd `EnvironmentFile=`, Docker
-  `env_file`, Kubernetes `Secret`, etc.) — **do not** rely on values
-  committed to `appsettings.json`. `env=prd` is what actually disables
-  Swagger UI, verbose GraphQL error details, and EF Core sensitive-data SQL
-  logging — it's a separate setting from `ASPNETCORE_ENVIRONMENT`.
+  logical environment name — see Configuration Reference below) via the
+  Elastic Beanstalk environment's **Configuration → Software → Environment
+  properties**, along with every variable from `.env.example` — **do not**
+  rely on values committed to `appsettings.json`. `env=prd` is what actually
+  disables Swagger UI, verbose GraphQL error details, and EF Core
+  sensitive-data SQL logging — it's a separate setting from
+  `ASPNETCORE_ENVIRONMENT`.
 - Populate `AllowedOrigins` (see Configuration Reference) for any
   non-dev/qa environment — otherwise CORS stays wide open
   (`AllowAnyOrigin`) by design, to avoid breaking anything before real
   frontend domains are configured.
-- Put the app behind a reverse proxy (nginx, etc.) that forwards to Kestrel,
-  per standard ASP.NET Core Linux deployment guidance.
-- `app.UseWebSockets()` is enabled for GraphQL subscriptions — make sure your
-  reverse proxy is configured to allow WebSocket upgrades on the `/graphql`
-  path.
-- No CI pipeline is currently checked into this repo. Set one up with a
-  `dotnet publish` + container or systemd-based deployment step as
-  appropriate for your hosting target.
+- `app.UseWebSockets()` is enabled for GraphQL subscriptions — Elastic
+  Beanstalk's load balancer must have WebSocket support enabled (the default
+  Application Load Balancer supports WebSockets natively; no extra config
+  needed unless using a Classic Load Balancer).
+- No CI pipeline is currently checked into this repo — deploys are run
+  manually via `eb deploy`. If automating, wire `eb deploy` (or the
+  equivalent `aws elasticbeanstalk` API calls) into whatever CI runner is
+  adopted.
 
 ### Database migrations in production
 
