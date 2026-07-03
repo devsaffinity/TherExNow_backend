@@ -7,30 +7,27 @@ var app = builder.Build();
 var dbContext = app.Services.GetRequiredService<IDbContextFactory<DataContext>>();
 DataInitializer.Initialize(dbContext.CreateDbContext(), true);
 
-
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+var isProd = builder.Configuration["env"] == "prd";
+if (!isProd)
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Example API V1");
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Example API V1");
+    });
+}
 
 app.UseGraphQLAltair();
-app.UseCors("AllowAllOrigins");
 app.UseWebSockets();
+app.UseRouting();
+app.UseCors("AllowAllOrigins");
 app.UseAuthentication();
 app.UseMiddleware<AuthMiddleware>();
-
-app.UseRouting()
-    .UseEndpoints(endpoint =>
-    {
-        endpoint.MapGraphQL();
-    });
-
 app.UseAuthorization();
 
 app.UseEndpoints(endpoints =>
 {
-    //endpoints.MapControllers();
+    endpoints.MapGraphQL();
     endpoints.MapControllerRoute(
         name: "default",
         pattern: "{controller}/{action}/{id?}");
