@@ -11,7 +11,7 @@ public class AuthMiddleware
 
     public async Task InvokeAsync(HttpContext httpContext, IUserRepository userRepo)
     {
-        if (httpContext.User is not null && httpContext.User.Identity.IsAuthenticated)
+        if (httpContext.User?.Identity is not null && httpContext.User.Identity.IsAuthenticated)
         {
             var externalId = httpContext.User.FindFirstValue("user_id");
 

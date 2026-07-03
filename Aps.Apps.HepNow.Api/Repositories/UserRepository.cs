@@ -6,12 +6,7 @@ public class UserRepository : UserRepositoryBase<DataContext, Users>, IUserRepos
 {
     public UserRepository(IDbContextFactory<DataContext> dbContextFactory) : base(dbContextFactory)
     {
-        context = dbContextFactory.CreateDbContext();
     }
-
-    #region props
-    private DataContext context;
-    #endregion
 
     #region functions
     public IQueryable<UserDto> GetUsers()
