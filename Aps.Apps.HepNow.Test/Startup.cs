@@ -27,12 +27,12 @@ namespace Aps.Apps.HepNow.Test
 
     public class UnitTestTopicEventSender : ITopicEventSender
     {
-        public ValueTask CompleteAsync<TTopic>(TTopic topic) where TTopic : notnull
+        public ValueTask CompleteAsync(string topic)
         {
             return default(ValueTask); //No Action
         }
 
-        public ValueTask SendAsync<TTopic, TMessage>(TTopic topic, TMessage message, CancellationToken cancellationToken = default) where TTopic : notnull
+        public ValueTask SendAsync<TMessage>(string topic, TMessage message, CancellationToken cancellationToken = default)
         {
             return default(ValueTask); //No Action
         }

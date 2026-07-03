@@ -79,11 +79,6 @@ public static class IServiceExtensions
                 Console.WriteLine(e.Exception);
                 return e;
             })
-            .OnSchemaError((descriptorContext, exception) =>
-            {
-                //for debug only
-                Console.WriteLine(exception);
-            })
             .AddHttpRequestInterceptor<HttpRequestInterceptor>()
             .AddQueryType<QueryType>()
             .AddMutationType<MutationType>()
