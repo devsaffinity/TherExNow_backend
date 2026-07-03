@@ -4,6 +4,7 @@ using Aps.Apps.HepNow.Models.Dtos;
 using Apsy.Common.Api.Auth;
 using Apsy.Common.Api.Core.ApiDoc;
 using HotChocolate.Execution.Configuration;
+using HotChocolate.Types.Pagination;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Logging.Debug;
@@ -107,7 +108,17 @@ public static class IServiceExtensions
             .AddSorting()
             .AddProjections()
             .AddAuthorization()
-            .AddInMemorySubscriptions();
+            .AddInMemorySubscriptions()
+            // HotChocolate 13 defaults to naming CollectionSegment types after the field
+            // name they're bound to (e.g. "Result") instead of the item type. Every
+            // ListResponseBase<T>.Result property shares that field name, so every paged
+            // query collapsed onto a single shared "ResultCollectionSegment" type - whichever
+            // T won schema build order. Restoring the pre-13 (item-type-based) naming keeps
+            // each query's collection segment distinct, matching prod's HotChocolate 12 behavior.
+            .ConfigureSchema(schema => schema.SetPagingOptions(new PagingOptions
+            {
+                InferCollectionSegmentNameFromField = false
+            }));
 
         AddQueryMutationSubscription(services, graphql);
         #endregion

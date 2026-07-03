@@ -381,3 +381,7 @@ appsettings.*.local.json
 appsettings.Production.json
 appsettings.Development.json
 appsettings.Staging.json
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
