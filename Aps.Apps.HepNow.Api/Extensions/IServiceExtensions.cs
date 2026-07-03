@@ -98,12 +98,7 @@ public static class IServiceExtensions
 
         var graphql = services.AddGraphQLServer()
             .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = configuration["env"] != "prd")
-            .AddErrorFilter(e =>
-            {
-                //for debug only
-                Console.WriteLine(e.Exception);
-                return e;
-            })
+            .AddErrorFilter<GraphQLErrorFilter>()
             .AddHttpRequestInterceptor<HttpRequestInterceptor>()
             .AddQueryType<QueryType>()
             .AddMutationType<MutationType>()
