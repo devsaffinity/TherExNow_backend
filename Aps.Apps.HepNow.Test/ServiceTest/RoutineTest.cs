@@ -112,8 +112,50 @@
         }
 
         [Theory]
+        [InlineData("unique Routine name for deduped exercise update", "description", "/url", 1, HoldType.Sec, 2, PerformType.Hour, 3, 4, "note", DatabaseFixture.NormalUserId, DatabaseFixture.FirstExerciseId)]
+        public void Update_WithExerciseAlreadyDeduplicated_SavesSingleEntry(string name, string description, string fileUrl, int hold, HoldType holdType, int perform, PerformType performType
+            , int reps, int set, string note, int userId, int exerciseId)
+        {
+            // Simulates what RoutineMutations.Update passes to the service after
+            // collapsing duplicate exerciseIds from the raw client input.
+            var routine = new Routines
+            {
+                Name = Guid.NewGuid().ToString(),
+                UserId = userId,
+            };
+            var addResponse = routineService.Add(routine);
+
+            var input = new RoutineInput
+            {
+                Id = addResponse.Result.Id,
+                Name = name,
+                Description = description,
+                FileUrl = fileUrl,
+                UserId = userId,
+                RoutineExercises = new List<RoutineExerciseInput>
+                {
+                    new RoutineExerciseInput
+                    {
+                        ExerciseId = exerciseId,
+                        Hold = hold,
+                        HoldType = holdType,
+                        Perform = perform,
+                        PerformType = performType,
+                        Note = note,
+                        Reps = reps,
+                        Set = set,
+                    }
+                }
+            };
+
+            var response = routineService.Update(input);
+            Assert.True(response.Status == ResponseStatus.Success
+                && response.Result.RoutineExercises.Count(re => re.ExerciseId == exerciseId) == 1);
+        }
+
+        [Theory]
         [InlineData(DatabaseFixture.NormalUserId)]
-        public void Delete(int userId) 
+        public void Delete(int userId)
         {
             var Routine = new Routines
             {

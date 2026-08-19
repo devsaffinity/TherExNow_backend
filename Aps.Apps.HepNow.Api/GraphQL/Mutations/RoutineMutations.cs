@@ -30,6 +30,8 @@ public class RoutineMutations : MutationBase<Routines, RoutineInput, IRoutineSer
         if (service.Any(a => a.UserId == authentication.CurrentUser.Id && a.Name == input.Name).Status == ResponseStatus.Success)
             return CustomResponseStatus.DuplicateName;
 
+        input.RoutineExercises = DeduplicateByExerciseId(input.RoutineExercises);
+
         return service.Add(input);
     }
 
@@ -45,7 +47,21 @@ public class RoutineMutations : MutationBase<Routines, RoutineInput, IRoutineSer
             if (service.Any(a => a.UserId == authentication.CurrentUser.Id && a.Name == input.Name && a.Id != input.Id).Status == ResponseStatus.Success)
                 return CustomResponseStatus.DuplicateName;
         }
+
+        input.RoutineExercises = DeduplicateByExerciseId(input.RoutineExercises);
+
         return service.Update(input);
+    }
+
+    private static List<RoutineExerciseInput> DeduplicateByExerciseId(List<RoutineExerciseInput> routineExercises)
+    {
+        if (routineExercises is null)
+            return null;
+
+        return routineExercises
+            .GroupBy(e => e.ExerciseId)
+            .Select(g => g.First())
+            .ToList();
     }
 
     [GraphQLName("routine_deleteRoutine")]

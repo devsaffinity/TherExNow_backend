@@ -33,5 +33,6 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller}/{action}/{id?}");
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+var defaultPort = isProd ? "5000" : "5050";
+var port = Environment.GetEnvironmentVariable("PORT") ?? defaultPort;
 app.Run($"http://0.0.0.0:{port}");

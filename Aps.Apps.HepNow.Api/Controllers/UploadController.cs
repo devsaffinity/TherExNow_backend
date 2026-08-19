@@ -60,6 +60,70 @@ namespace Aps.Apps.HepNow.Controllers
             }
         }
 
+        [HttpPost("CompleteMultipartUpload")]
+        public async Task<IActionResult> CompleteMultipartUploadAsync([FromBody] CompleteMultipartUploadInput input)
+        {
+            try
+            {
+                var parts = new List<PartETag>();
+                var listRequest = new ListPartsRequest
+                {
+                    BucketName = _bucketName,
+                    Key = input.key,
+                    UploadId = input.uploadId
+                };
+
+                ListPartsResponse listResponse;
+                do
+                {
+                    listResponse = await _s3Client.ListPartsAsync(listRequest);
+                    parts.AddRange(listResponse.Parts.Select(p => new PartETag(p.PartNumber, p.ETag)));
+                    listRequest.PartNumberMarker = listResponse.NextPartNumberMarker.ToString();
+                } while (listResponse.IsTruncated);
+
+                if (input.expectedPartCount > 0 && parts.Count != input.expectedPartCount)
+                {
+                    return BadRequest($"Expected {input.expectedPartCount} parts but S3 has {parts.Count}.");
+                }
+
+                await _s3Client.CompleteMultipartUploadAsync(new CompleteMultipartUploadRequest
+                {
+                    BucketName = _bucketName,
+                    Key = input.key,
+                    UploadId = input.uploadId,
+                    PartETags = parts
+                });
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing multipart upload for {ObjectKey}", input.key);
+                return BadRequest($"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpPost("AbortMultipartUpload")]
+        public async Task<IActionResult> AbortMultipartUploadAsync([FromBody] AbortMultipartUploadInput input)
+        {
+            try
+            {
+                await _s3Client.AbortMultipartUploadAsync(new AbortMultipartUploadRequest
+                {
+                    BucketName = _bucketName,
+                    Key = input.key,
+                    UploadId = input.uploadId
+                });
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error aborting multipart upload for {ObjectKey}", input.key);
+                return BadRequest($"Internal server error: {ex.Message}");
+            }
+        }
+
         private async Task<string> GeneratePresignedUrl(string objectKey, int chunkNumber, double duration, string uploadId)
         {
             try

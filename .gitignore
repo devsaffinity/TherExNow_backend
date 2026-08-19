@@ -385,3 +385,13 @@ appsettings.Staging.json
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+
+# Python virtual environments (used for ad-hoc local scripts, not part of the .NET build)
+.venv/
+venv/
+
+# JetBrains Rider / IntelliJ
+.idea/
+
+# macOS
+.DS_Store
