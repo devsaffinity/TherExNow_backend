@@ -45,8 +45,14 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         else if (user.ExternalId == externalId || user.ExternalId2 == externalId)
             return ResponseStatus.AlreadyExists;
 
-        if (user.Email == userInput.Email && user.ExternalId2 == null)
+        // Keyed off `email` — read from the caller's token by UserMutations — rather than
+        // userInput.Email, which is client-supplied and would let a caller name whichever account
+        // they wanted to attach their UID to.
+        if (!string.IsNullOrEmpty(email) && user.Email == email
+            && user.ExternalId != externalId && user.ExternalId2 != externalId)
+        {
             user.ExternalId2 = externalId;
+        }
 
         repository.Update(user);
         return ResponseBase<Users>.Success(user);

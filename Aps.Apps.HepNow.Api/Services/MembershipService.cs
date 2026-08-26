@@ -152,8 +152,11 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         }
 
         // Find selected package by client
-        var plan = forYear ? planRepository.Where(a => a.PriceIdYear != null && a.PriceYear > 0).FirstOrDefault()
-                           : planRepository.Where(a => a.PriceIdMonth != null && a.PriceMonth > 0).FirstOrDefault();
+        var plan = forYear ? planRepository.Where(a => !string.IsNullOrEmpty(a.PriceIdYear) && a.PriceYear > 0).FirstOrDefault()
+                           : planRepository.Where(a => !string.IsNullOrEmpty(a.PriceIdMonth) && a.PriceMonth > 0).FirstOrDefault();
+        // No fallback to "any plan with a price": such a plan is, by definition, one that just
+        // failed the PriceId check above, and the Stripe session below is built from that missing
+        // PriceId. Falling through would swap a clean NotFound for a malformed checkout session.
         if (plan == null)
         {
             return ResponseStatus.NotFound;

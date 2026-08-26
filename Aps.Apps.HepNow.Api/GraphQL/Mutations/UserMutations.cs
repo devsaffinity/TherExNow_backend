@@ -1,3 +1,4 @@
+using Aps.Apps.HepNow.Extensions;
 using Aps.CommonBack.Base;
 using Aps.CommonBack.Base.Attributes;
 namespace Aps.Apps.HepNow.GraphQL.Mutations;
@@ -43,17 +44,13 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         if (result.Status == ResponseStatus.UserNotFound)
         {
             string externalId = claims.FindFirstValue("user_id");
-            string email = null;
-            try
-            {
-                email = ((dynamic)JsonConvert.DeserializeObject<object>(claims.FindFirstValue("firebase"))).identities.email[0];
 
-                if (string.IsNullOrEmpty(input.Email))
-                    input.Email = email;
-            }
-            catch (Exception)
-            {
-            }
+            // Was a `dynamic` walk over the raw firebase claim wrapped in a bare catch, which hid
+            // RuntimeBinderException and silently produced a null email on any shape change.
+            string email = FirebaseClaims.GetEmail(claims);
+
+            if (string.IsNullOrEmpty(input.Email))
+                input.Email = email;
 
             result = service.SignUp(externalId, email, input);
         }
@@ -75,7 +72,11 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
             await notificationService.Send(notificationInput);
 
             var user = service.Get(result.Result.Id).Result;
-            if (input.IsSocial == true)
+
+            // Skipping the confirmation email is driven by the token, not by input.IsSocial: that
+            // flag is client-supplied, so trusting it let any caller mark itself confirmed and
+            // bypass email verification entirely.
+            if (FirebaseClaims.IsEmailVerified(claims))
             {
                 user.IsConfirmed = true;
                 service.Update(user);
