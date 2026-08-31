@@ -20,6 +20,10 @@ namespace Aps.Apps.HepNow.Test
 
             services.AddPooledDbContextFactory<DataContext>(options => options.UseInMemoryDatabase("therexnow-test-db"));
 
+            // UserService reads the caller's token claims to decide whether an account may be
+            // claimed by email. The app registers this in AddServices, which the tests bypass.
+            services.AddHttpContextAccessor();
+
             IServiceExtensions.AddRepositoryAndService(services);
             services.AddScoped<ITopicEventSender, UnitTestTopicEventSender>();
         }

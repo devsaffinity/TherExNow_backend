@@ -1,3 +1,4 @@
+using Aps.Apps.HepNow.Extensions;
 using Aps.Apps.HepNow.Models.Dtos;
 using Aps.Apps.HepNow.Models.Inputs;
 using Aps.Apps.HepNow.Services.Contracts;
@@ -12,7 +13,7 @@ namespace Aps.Apps.HepNow.Services;
 
 public class UserService : UserServiceBase<Users, UserInput>, IUserService
 {
-    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService, ILogger<UserService> logger) : base(repository)
+    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService, ILogger<UserService> logger, IHttpContextAccessor httpContextAccessor) : base(repository)
     {
         this.repository = repository;
         this.sendGridConfig = sendGridConfig;
@@ -20,6 +21,7 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         this.firebaseAppCreator = firebaseAppCreator;
         _emailService = emailService;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     #region props
@@ -29,6 +31,7 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
     private readonly FirebaseAppCreator firebaseAppCreator;
     private readonly IEmailService _emailService;
     private readonly ILogger<UserService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     #endregion
 
     #region functions
@@ -40,19 +43,29 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         if (user == null)
             return base.SignUp(externalId, email, userInput);
         
+        var callerOwnsRow = user.ExternalId == externalId || user.ExternalId2 == externalId;
+
+        // The lookup above can also match on userInput.Email, which is client-supplied, so a caller
+        // can name any account. Claiming a row that is not already keyed to this Firebase UID
+        // therefore needs a provider-verified address on the token, matched against the row's own
+        // email — not against userInput.Email. Firebase issues a token the moment an email/password
+        // account is created, so without this, registering a victim's address and calling
+        // user_signUp attaches the caller's UID to the victim's account. Returning early also keeps
+        // an unverified caller from restoring, mutating, or reading back a row it does not own.
+        if (!callerOwnsRow)
+        {
+            var claims = _httpContextAccessor.HttpContext?.User;
+            if (!FirebaseClaims.IsEmailVerified(claims) || string.IsNullOrEmpty(email) || user.Email != email)
+                return ResponseStatus.AlreadyExists;
+        }
+
         if (user.IsDeleted)
             user.IsDeleted = false;
-        else if (user.ExternalId == externalId || user.ExternalId2 == externalId)
+        else if (callerOwnsRow)
             return ResponseStatus.AlreadyExists;
 
-        // Keyed off `email` — read from the caller's token by UserMutations — rather than
-        // userInput.Email, which is client-supplied and would let a caller name whichever account
-        // they wanted to attach their UID to.
-        if (!string.IsNullOrEmpty(email) && user.Email == email
-            && user.ExternalId != externalId && user.ExternalId2 != externalId)
-        {
+        if (!callerOwnsRow)
             user.ExternalId2 = externalId;
-        }
 
         repository.Update(user);
         return ResponseBase<Users>.Success(user);

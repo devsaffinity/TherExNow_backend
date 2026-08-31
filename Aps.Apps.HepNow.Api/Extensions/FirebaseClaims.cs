@@ -50,12 +50,18 @@ public static class FirebaseClaims
             return false;
         }
 
-        // JwtBearer surfaces the token's boolean as the string "true"/"false".
-        if (bool.TryParse(principal.FindFirstValue("email_verified"), out var verified) && verified)
+        // JwtBearer surfaces the token's boolean as the string "true"/"false". When the claim is
+        // present it is authoritative in BOTH directions: an explicit false must not be overridden
+        // by the provider allowlist below, or a federated sign-in that the provider itself declined
+        // to verify (Apple's Hide My Email, a Google account still pending verification) would be
+        // treated as proof of ownership.
+        if (bool.TryParse(principal.FindFirstValue("email_verified"), out var verified))
         {
-            return true;
+            return verified;
         }
 
+        // Only when the claim is absent entirely do we fall back to the provider, which is why the
+        // allowlist is limited to providers that establish ownership before issuing an identity.
         var provider = GetSignInProvider(principal);
         return provider != null && VerifiedProviders.Contains(provider);
     }
