@@ -55,7 +55,8 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         if (!callerOwnsRow)
         {
             var claims = _httpContextAccessor.HttpContext?.User;
-            if (!FirebaseClaims.IsEmailVerified(claims) || string.IsNullOrEmpty(email) || user.Email != email)
+            if (!FirebaseClaims.IsEmailVerified(claims) || string.IsNullOrEmpty(email) || user.Email != email
+                || user.ExternalId2 != null)
                 return ResponseStatus.AlreadyExists;
         }
 
