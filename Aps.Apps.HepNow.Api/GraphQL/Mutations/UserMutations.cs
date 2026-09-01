@@ -92,7 +92,11 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
                     .Replace("[TermsAndConditionUrl]", configuration["TermsAndConditionUrl"])
                     .Replace("[User]", input.FullName ?? input.Email);
                     
-                if (input.ConfirmUrl.ToLower().StartsWith("http")) //web
+                // Null-safe because this line is newly reachable: a Facebook sign-up used to
+                // return above on input.IsSocial and never got here, so a client that omits
+                // ConfirmUrl on its social path would now throw after the row and the free plan
+                // were already created. No ConfirmUrl falls through to the API confirm link below.
+                if (input.ConfirmUrl?.StartsWith("http", StringComparison.OrdinalIgnoreCase) == true) //web
                 {
                     content = content.Replace("[Link]", input.ConfirmUrl + "?ConfirmKey=" + user.ConfirmKey);
 
