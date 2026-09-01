@@ -295,6 +295,18 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
 
                     if (!string.IsNullOrEmpty(record?.Email))
                         return record.Email;
+
+                    // Social sign-ins land the address on the provider entry and leave
+                    // UserRecord.Email null. Every Apple, Google and Facebook account in this
+                    // database looks like that, which is why checkout thought they had no address
+                    // at all. Apple's privaterelay.appleid.com addresses are real and deliverable,
+                    // so they are fine to bill against.
+                    var providerEmail = record?.ProviderData
+                        ?.Select(provider => provider.Email)
+                        .FirstOrDefault(email => !string.IsNullOrEmpty(email));
+
+                    if (!string.IsNullOrEmpty(providerEmail))
+                        return providerEmail;
                 }
                 catch (FirebaseAuthException ex)
                 {
