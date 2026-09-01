@@ -47,10 +47,19 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
 
             // Was a `dynamic` walk over the raw firebase claim wrapped in a bare catch, which hid
             // RuntimeBinderException and silently produced a null email on any shape change.
-            string email = FirebaseClaims.GetEmail(claims);
+            string tokenEmail = FirebaseClaims.GetEmail(claims);
 
             if (string.IsNullOrEmpty(input.Email))
-                input.Email = email;
+                input.Email = tokenEmail;
+
+            // UserServiceBase.SignUp assigns `val.Email = email` last, so whatever is passed here
+            // overwrites the address mapped from the input. Passing the token's address blindly
+            // therefore threw away a perfectly good sign-up form value whenever the provider did
+            // not return one -- a Facebook account with no verified email being the usual case.
+            // The row was then stored with Email = null, and because nothing in the app can set an
+            // address afterwards (the profile form has no email field), that account could never
+            // start a subscription: MembershipService.CreateSubscription rejects a null email.
+            string email = !string.IsNullOrEmpty(tokenEmail) ? tokenEmail : input.Email;
 
             result = service.SignUp(externalId, email, input);
         }

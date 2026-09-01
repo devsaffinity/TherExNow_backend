@@ -1,4 +1,5 @@
 using AppleReceiptVerifierNET;
+using Aps.Apps.HepNow.Extensions;
 using Aps.Apps.HepNow.Models.Dtos;
 using Google.Apis.AndroidPublisher.v3;
 using Google.Apis.Auth.OAuth2;
@@ -16,7 +17,8 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         , IUserRepository userRepository
         , IRoutineRepository routineRepository
         , IOptions<StripeSettings> stripeSettings, IConfiguration configuration
-        , [Service] INotificationService notificationService) : base(repository)
+        , [Service] INotificationService notificationService
+        , IHttpContextAccessor httpContextAccessor) : base(repository)
     {
         this.repository = repository;
         this.planRepository = planRepository;
@@ -25,6 +27,7 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         this.stripeSettings = stripeSettings;
         this.configuration = configuration;
         this.notificationService = notificationService;
+        _httpContextAccessor = httpContextAccessor;
         StripeConfiguration.ApiKey = stripeSettings.Value.Secretkey;
     }
 
@@ -36,6 +39,7 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
     private readonly IOptions<StripeSettings> stripeSettings;
     private readonly IConfiguration configuration;
     private readonly INotificationService notificationService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     #endregion
     #region functions
@@ -140,7 +144,24 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
     {
         if (user.StripeCustomerId == null)
         {
-            if (user.Email == null)
+            // Accounts created before UserMutations.SignUp stopped discarding the sign-up form's
+            // address can be sitting on Email = null, and nothing in the app can set one — the
+            // profile form has no email field. That left the account permanently unable to
+            // subscribe. The caller is authenticated, so recover the address from their token and
+            // persist it rather than sending them to support for a value we already hold.
+            if (string.IsNullOrEmpty(user.Email))
+            {
+                var claimedEmail = FirebaseClaims.GetEmail(_httpContextAccessor.HttpContext?.User);
+
+                if (!string.IsNullOrEmpty(claimedEmail))
+                {
+                    user.Email = claimedEmail;
+                    userRepository.Update(user);
+                }
+            }
+
+            // Still nothing to bill against — the provider never gave us an address either.
+            if (string.IsNullOrEmpty(user.Email))
                 return ResponseStatus.NotEnoghData;
 
             var customerResult = CreateCustomer(user.Id);
