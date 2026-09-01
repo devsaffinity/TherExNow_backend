@@ -1,6 +1,7 @@
 using AppleReceiptVerifierNET;
 using Aps.Apps.HepNow.Extensions;
 using Aps.Apps.HepNow.Models.Dtos;
+using FirebaseAdmin.Auth;
 using Google.Apis.AndroidPublisher.v3;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
@@ -19,9 +20,11 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         , IOptions<StripeSettings> stripeSettings, IConfiguration configuration
         , [Service] INotificationService notificationService
         , IHttpContextAccessor httpContextAccessor
+        , FirebaseAppCreator firebaseAppCreator
         , ILogger<MembershipService> logger) : base(repository)
     {
         _logger = logger;
+        _firebaseAppCreator = firebaseAppCreator;
         this.repository = repository;
         this.planRepository = planRepository;
         this.userRepository = userRepository;
@@ -43,6 +46,7 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
     private readonly INotificationService notificationService;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<MembershipService> _logger;
+    private readonly FirebaseAppCreator _firebaseAppCreator;
 
     #endregion
     #region functions
@@ -156,18 +160,30 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
             {
                 // The caller's principal is preferred; the accessor is only a fallback because it
                 // is not dependable inside a HotChocolate resolver's execution scope.
-                var claimedEmail = FirebaseClaims.GetEmail(claims)
+                var recoveredEmail = FirebaseClaims.GetEmail(claims)
                     ?? FirebaseClaims.GetEmail(_httpContextAccessor.HttpContext?.User);
+                var source = "request principal";
 
-                if (!string.IsNullOrEmpty(claimedEmail))
+                // A Firebase ID token does not always carry an email claim even when the account
+                // behind it has an address on file, so ask Firebase directly before giving up.
+                // This is the last automatic source; anything past here needs the user to supply one.
+                if (string.IsNullOrEmpty(recoveredEmail))
                 {
-                    user.Email = claimedEmail;
+                    recoveredEmail = await GetFirebaseEmailAsync(user);
+                    source = "firebase user record";
+                }
+
+                if (!string.IsNullOrEmpty(recoveredEmail))
+                {
+                    user.Email = recoveredEmail;
                     userRepository.Update(user);
-                    _logger.LogInformation("Recovered billing email for user {UserId} from the request principal", user.Id);
+                    _logger.LogInformation("Recovered billing email for user {UserId} from the {Source}", user.Id, source);
                 }
                 else
                 {
-                    _logger.LogWarning("Subscription blocked: user {UserId} has no stored email and the principal carries none", user.Id);
+                    _logger.LogWarning(
+                        "Subscription blocked: user {UserId} has no stored email, no email claim, and no address on their Firebase record (externalId {ExternalId} / {ExternalId2})",
+                        user.Id, user.ExternalId, user.ExternalId2);
                 }
             }
 
@@ -255,6 +271,44 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         }
 
         return ResponseStatus.Success;
+    }
+
+    /// <summary>
+    /// The address Firebase holds for this account, across both linked sign-in ids. Returns null
+    /// rather than throwing: a Firebase outage must not turn a checkout into a 500, and the caller
+    /// already handles "no address available".
+    /// </summary>
+    private async Task<string> GetFirebaseEmailAsync(Users user)
+    {
+        try
+        {
+            var auth = FirebaseAuth.GetAuth(_firebaseAppCreator.GetFirebaseApp());
+
+            foreach (var externalId in new[] { user.ExternalId, user.ExternalId2 })
+            {
+                if (string.IsNullOrEmpty(externalId))
+                    continue;
+
+                try
+                {
+                    var record = await auth.GetUserAsync(externalId);
+
+                    if (!string.IsNullOrEmpty(record?.Email))
+                        return record.Email;
+                }
+                catch (FirebaseAuthException ex)
+                {
+                    // A stale or deleted uid on one of the two slots is expected; try the other.
+                    _logger.LogWarning(ex, "Firebase lookup failed for external id {ExternalId}", externalId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not reach Firebase to recover an email for user {UserId}", user.Id);
+        }
+
+        return null;
     }
 
     public virtual bool CreateCustomer(int userId)
