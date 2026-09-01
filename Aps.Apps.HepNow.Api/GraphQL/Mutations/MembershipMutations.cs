@@ -54,7 +54,9 @@ public class MembershipMutations: MutationBase<Memberships,MembershipInput,IMemb
         if (authentication.Status != ResponseStatus.Success)
             return authentication.Status;
 
-        return await _membershipService.CreateSubscription(authentication.CurrentUser, forYear, successUrl, cancelUrl);
+        // Hand the resolved principal over rather than letting the service reach for
+        // IHttpContextAccessor: an account stored without an email needs it to recover one.
+        return await _membershipService.CreateSubscription(authentication.CurrentUser, forYear, successUrl, cancelUrl, authentication.Claims);
     }
 
     [GraphQLName("membership_cancelSubscription")]

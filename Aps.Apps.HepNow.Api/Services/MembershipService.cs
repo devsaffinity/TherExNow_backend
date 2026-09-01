@@ -18,8 +18,10 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         , IRoutineRepository routineRepository
         , IOptions<StripeSettings> stripeSettings, IConfiguration configuration
         , [Service] INotificationService notificationService
-        , IHttpContextAccessor httpContextAccessor) : base(repository)
+        , IHttpContextAccessor httpContextAccessor
+        , ILogger<MembershipService> logger) : base(repository)
     {
+        _logger = logger;
         this.repository = repository;
         this.planRepository = planRepository;
         this.userRepository = userRepository;
@@ -40,6 +42,7 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
     private readonly IConfiguration configuration;
     private readonly INotificationService notificationService;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<MembershipService> _logger;
 
     #endregion
     #region functions
@@ -140,7 +143,7 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         return ResponseBase<IntentDto>.Success(result);
     }
 
-    public async Task<ResponseBase<string>> CreateSubscription(Users user, bool forYear, string successUrl, string cancelUrl)
+    public async Task<ResponseBase<string>> CreateSubscription(Users user, bool forYear, string successUrl, string cancelUrl, ClaimsPrincipal claims = null)
     {
         if (user.StripeCustomerId == null)
         {
@@ -151,12 +154,20 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
             // persist it rather than sending them to support for a value we already hold.
             if (string.IsNullOrEmpty(user.Email))
             {
-                var claimedEmail = FirebaseClaims.GetEmail(_httpContextAccessor.HttpContext?.User);
+                // The caller's principal is preferred; the accessor is only a fallback because it
+                // is not dependable inside a HotChocolate resolver's execution scope.
+                var claimedEmail = FirebaseClaims.GetEmail(claims)
+                    ?? FirebaseClaims.GetEmail(_httpContextAccessor.HttpContext?.User);
 
                 if (!string.IsNullOrEmpty(claimedEmail))
                 {
                     user.Email = claimedEmail;
                     userRepository.Update(user);
+                    _logger.LogInformation("Recovered billing email for user {UserId} from the request principal", user.Id);
+                }
+                else
+                {
+                    _logger.LogWarning("Subscription blocked: user {UserId} has no stored email and the principal carries none", user.Id);
                 }
             }
 
