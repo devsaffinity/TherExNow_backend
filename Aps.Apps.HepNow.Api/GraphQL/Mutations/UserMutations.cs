@@ -66,6 +66,11 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
             // start a subscription: MembershipService.CreateSubscription rejects a null email.
             string email = !string.IsNullOrEmpty(tokenEmail) ? tokenEmail : input.Email;
 
+            // UserInput.UserType is client-supplied and the base sign-up maps it straight onto the new
+            // row, so a caller could register itself as Admin. Admins are never created by sign-up.
+            if (input.UserType == UserType.Admin)
+                input.UserType = UserType.NormalUser;
+
             result = service.SignUp(externalId, email, input);
         }
         else
@@ -148,6 +153,12 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
 
         if (input.Id.HasValue && user.UserType != UserType.Admin)
             return ResponseStatus.NotAllowd;
+
+        // EntityDef.Update copies every non-null input property onto the row, enums included, so a
+        // member updating their own profile could set UserType = Admin. Only an admin may change a
+        // role; a null here means "leave it as it is".
+        if (user.UserType != UserType.Admin)
+            input.UserType = null;
 
         if (input.Id == null)
             input.Id = user.Id;
