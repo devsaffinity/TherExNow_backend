@@ -12,6 +12,11 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
     public override ResponseBase<Users> Create(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IUserService service, UserInput input) => null;
     [GraphQLIgnore]
     public override ResponseBase<Users> RemoveUser(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IUserService service) => null;
+    // The inherited MutationBase.Delete checks only that the caller is signed in and then hard-deletes
+    // whatever user id it is given. user_deleteUser below is an overload (int? userId), not an
+    // override, so without this the base method surfaced as the root `delete(entityId: Int!)` field.
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IUserService service, int entityId) => null;
 
     /*[GraphQLName("user_createUserInFirebase")]
     public ResponseStatus CreateUserInFirebase([Service] IUserService service, string email, string password)

@@ -6,6 +6,9 @@ namespace Aps.Apps.HepNow.GraphQL.Mutations;
 public class PlanMutations : MutationBase<Plans, PlanInput, IPlanService, Users>
 {
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IPlanService service, int entityId) => null;
+
     [GraphQLName("plan_createPlan")]
     public ResponseBase<Plans> Create([Authentication] Authentication authentication, [Service] IPlanService service, PlanInput input)
     {

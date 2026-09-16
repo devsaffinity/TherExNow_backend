@@ -6,6 +6,9 @@ namespace Aps.Apps.HepNow.GraphQL.Mutations;
 public class ShoppingCartMutations : MutationBase<ShoppingCart, ShoppingCartInput, IShoppingCartService, Users>
 {
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IShoppingCartService service, int entityId) => null;
+
     public ResponseBase<ShoppingCart> Update([Authentication] Authentication authentication, [Service] IShoppingCartService service, ShoppingCartInput input)
     {
         if (authentication.Status != ResponseStatus.Success)
@@ -24,6 +27,9 @@ public class ShoppingCartMutations : MutationBase<ShoppingCart, ShoppingCartInpu
         return service.Add(input);
     }
 
+    // Named explicitly: MutationType names this from the first public method called "Delete", which
+    // can now be the ignored override above, and the web and admin clients call this exact field.
+    [GraphQLName("shoppingCart_deleteShoppingCart")]
     public ResponseBase Delete([Authentication] Authentication authentication, [Service] IShoppingCartService service, int entityId)
     {
         if (authentication.Status != ResponseStatus.Success)

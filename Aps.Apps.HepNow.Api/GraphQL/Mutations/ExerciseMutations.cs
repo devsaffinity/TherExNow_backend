@@ -6,6 +6,9 @@ namespace Aps.Apps.HepNow.GraphQL.Mutations;
 public class ExerciseMutations: MutationBase<Exercises,ExerciseInput,IExerciseService,Users>
 {
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IExerciseService service, int entityId) => null;
+
     [GraphQLName("exercise_createExercise")]
     public ResponseBase<Exercises> Create([Authentication] Authentication authentication, [Service] IExerciseService service, [Service] ILogger<ExerciseMutations> logger, ExerciseInput input)
     {

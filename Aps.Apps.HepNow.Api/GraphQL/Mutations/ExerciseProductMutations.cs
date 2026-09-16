@@ -6,6 +6,9 @@ namespace Aps.Apps.HepNow.GraphQL.Mutations;
 public class ExerciseProductMutations: MutationBase<ExerciseProducts,ExerciseProductInput,IExerciseProductService,Users>
 {
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IExerciseProductService service, int entityId) => null;
+
     [GraphQLName("exerciseProduct_createExerciseProduct")]
     public ResponseBase<ExerciseProducts> Create([Authentication] Authentication authentication, [Service] IExerciseProductService service, ExerciseProductInput input)
     {

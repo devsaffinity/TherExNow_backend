@@ -6,6 +6,9 @@ namespace Aps.Apps.HepNow.GraphQL.Mutations;
 public class CategoryMutations : MutationBase<Categories, CategoryInput, ICategoryService, Users>
 {
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] ICategoryService service, int entityId) => null;
+
     [GraphQLName("category_createCategory")]
     public ResponseBase<Categories> Create([Authentication] Authentication authentication, [Service] ICategoryService service, CategoryInput input)
     {

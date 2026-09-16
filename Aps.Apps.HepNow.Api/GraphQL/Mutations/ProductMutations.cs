@@ -7,6 +7,9 @@ public class ProductMutations : MutationBase<Products, ProductInput, IProductSer
 {
 
     #region functions
+    [GraphQLIgnore]
+    public override ResponseBase Delete(ClaimsPrincipal claims, [Service(ServiceKind.Default)] IProductService service, int entityId) => null;
+
     [GraphQLName("product_createProduct")]
     public ResponseBase<Products> Create([Authentication] Authentication authentication, [Service] IProductService service, [Service] ILogger<ProductMutations> logger, ProductInput input)
     {
