@@ -19,5 +19,7 @@
         public static CustomResponseStatus LimitOfMoreThan5000Characters = new (110, nameof(LimitOfMoreThan5000Characters));
         public static CustomResponseStatus MaxTryFreePlanForQrCode = new(111, nameof(MaxTryFreePlanForQrCode));
         public static CustomResponseStatus MaxTryFreePlanForPrint = new(112, nameof(MaxTryFreePlanForPrint));
+        public static CustomResponseStatus SubscriptionCancellationFailed = new(113, nameof(SubscriptionCancellationFailed));
+        public static CustomResponseStatus PendingOrderExists = new(114, nameof(PendingOrderExists));
     }
 }

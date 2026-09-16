@@ -26,6 +26,11 @@ namespace Aps.Apps.HepNow.Test
 
             IServiceExtensions.AddRepositoryAndService(services);
             services.AddScoped<ITopicEventSender, UnitTestTopicEventSender>();
+
+            // appsettings.json carries real credential slots; keep Firebase, S3 and Stripe off the network.
+            services.AddSingleton<IFirebaseAccounts, FakeFirebaseAccounts>();
+            services.AddSingleton<IMediaStorage, FakeMediaStorage>();
+            services.AddSingleton(new FakeStripe().Client());
         }
     }
 

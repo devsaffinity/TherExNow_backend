@@ -143,7 +143,12 @@ namespace Aps.Apps.HepNow.Controllers
                         break;
                 }
 
-                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = json, EventId = stripeEvent.Id });
+                // The EventId row is what makes redelivery idempotent, so every event gets one. The raw payload is
+                // personal data (customer email, name, address), so it is kept only for the events handled above,
+                // where it is worth having when a membership looks wrong -- not for everything else Stripe sends,
+                // including events about customers whose accounts have since been deleted.
+                var handled = stripeEvent.Type is EventTypes.CustomerSubscriptionDeleted or EventTypes.CustomerSubscriptionUpdated or EventTypes.InvoicePaid;
+                webhookLogRepository.Add(new WebhookLog { Provider = MembershipProvider.Stripe, Data = handled ? json : null, EventId = stripeEvent.Id });
                 return Ok();
             }
             catch (StripeException e)

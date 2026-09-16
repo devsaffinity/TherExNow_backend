@@ -47,24 +47,6 @@ namespace Aps.Apps.HepNow.Test.ServicesTest
         }
 
         [Theory]
-        [InlineData("k34jkcj158wqkos", UserType.NormalUser)]
-        public void DeactivateUser(string externalId, UserType userType)
-        {
-            var newUser = new Users 
-            {
-                ExternalId = externalId,
-                UserType = userType 
-            };
-            var response = userService.Add(newUser);
-            Assert.Equal(response.Status, ResponseStatus.Success);
-            Assert.Equal(userService.Get(newUser.Id).Result.ExternalId, externalId);
-
-            response = userService.Remove(newUser.Id);
-            Assert.Equal(response.Status, ResponseStatus.Success);
-            Assert.True(userService.Get(newUser.Id).Result.IsDeleted);
-        }
-
-        [Theory]
         [InlineData("d32wl334gsda23", "SteveVBrower@dayrep.com", "Steve Brower", " +1254863258")]
         public void Update(string externalId, string email, string fullName, string phoneNumber)
         {

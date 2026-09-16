@@ -221,17 +221,50 @@ public class UserMutations : UserMutationBase<Users, UserInput, IUserService>
         return service.Update(user);
     }
 
+    /// <summary>
+    /// Permanently deletes an account. A member deletes their own (with or without their own id -- the web app
+    /// has always sent it); an admin may delete any member, but not another admin.
+    /// </summary>
     [GraphQLName("user_deleteUser")]
-    public ResponseBase Delete(ClaimsPrincipal claims, [Service] IUserService service, int? userId)
+    public async Task<ResponseBase> Delete(ClaimsPrincipal claims, [Service] IAccountPurgeService purgeService, int? userId)
     {
         if (!claims.Identity.IsAuthenticated) return ResponseStatus.AuthenticationFailed;
         var user = JsonConvert.DeserializeObject<Users>(claims.FindFirstValue("user"));
-        if (user == null) return ResponseStatus.UserNotFound;
 
-        if (userId.HasValue && user.UserType != UserType.Admin)
+        if (user == null)
+        {
+            if (userId.HasValue)
+                return ResponseStatus.UserNotFound;
+
+            // A valid token with no account row: an earlier deletion committed but stopped before removing the
+            // Firebase login (or only soft-deleted rows remain). Finish it, so the member is not left with a
+            // login that can never be closed.
+            return await purgeService.PurgeExternalIdAsync(claims.FindFirstValue("user_id"), "self:uid", refusePendingOrders: true);
+        }
+
+        if (!userId.HasValue || userId.Value == user.Id)
+            return await purgeService.PurgeUserAsync(user.Id, $"self:{user.Id}", refusePendingOrders: true);
+
+        if (user.UserType != UserType.Admin)
             return ResponseStatus.NotAllowd;
 
-        return service.Remove(userId ?? user.Id).Status;
+        return await purgeService.PurgeUserAsync(userId.Value, $"admin:{user.Id}", refuseAdminTarget: true);
+    }
+
+    /// <summary>
+    /// Temporary: clears the accounts that were only soft-deleted before deletion became permanent. Start with
+    /// dryRun: true. Remove this mutation once the dry run reports none left.
+    /// </summary>
+    [GraphQLName("user_purgeDeletedAccounts")]
+    public async Task<ResponseBase<string>> PurgeDeletedAccounts([Authentication] Authentication authentication, [Service] IAccountPurgeService purgeService, bool dryRun, int max)
+    {
+        if (authentication.Status != ResponseStatus.Success)
+            return authentication.Status;
+
+        if (authentication.CurrentUser.UserType != UserType.Admin)
+            return CustomResponseStatus.CurrentUserIsNotAdmin;
+
+        return await purgeService.PurgeSoftDeletedAsync(dryRun, max, $"admin:{authentication.CurrentUser.Id}");
     }
 
     [GraphQLName("user_sendEmail")]

@@ -13,7 +13,8 @@ namespace Aps.Apps.HepNow.Services;
 
 public class UserService : UserServiceBase<Users, UserInput>, IUserService
 {
-    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService, ILogger<UserService> logger, IHttpContextAccessor httpContextAccessor) : base(repository)
+    public UserService(IUserRepository repository, IOptions<SendGridConfig> sendGridConfig, IOptions<TwilioConfig> twilioConfig, FirebaseAppCreator firebaseAppCreator, IEmailService emailService, ILogger<UserService> logger, IHttpContextAccessor httpContextAccessor
+        , IAccountPurgeService accountPurgeService, IFirebaseAccounts firebaseAccounts) : base(repository)
     {
         this.repository = repository;
         this.sendGridConfig = sendGridConfig;
@@ -22,6 +23,8 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         _emailService = emailService;
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
+        _accountPurgeService = accountPurgeService;
+        _firebaseAccounts = firebaseAccounts;
     }
 
     #region props
@@ -32,6 +35,8 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
     private readonly IEmailService _emailService;
     private readonly ILogger<UserService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IAccountPurgeService _accountPurgeService;
+    private readonly IFirebaseAccounts _firebaseAccounts;
     #endregion
 
     #region functions
@@ -41,8 +46,17 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
     {
         var user = repository.Where(a => a.ExternalId == externalId || a.ExternalId2 == externalId || (!string.IsNullOrEmpty(userInput.Email) && a.Email == userInput.Email)).IgnoreQueryFilters().FirstOrDefault();
         if (user == null)
+        {
+            // JwtBearer does not check revocation, so an ID token issued before an account was deleted keeps
+            // working until it expires. Replaying one here would recreate an empty account for a login that no
+            // longer exists. A Firebase outage must not block every sign-up, so only a definite "no such uid"
+            // refuses.
+            if (!FirebaseUserStillExists(externalId))
+                return ResponseStatus.UserNotFound;
+
             return base.SignUp(externalId, email, userInput);
-        
+        }
+
         var callerOwnsRow = user.ExternalId == externalId || user.ExternalId2 == externalId;
 
         // The lookup above can also match on userInput.Email, which is client-supplied, so a caller
@@ -72,27 +86,40 @@ public class UserService : UserServiceBase<Users, UserInput>, IUserService
         return ResponseBase<Users>.Success(user);
     }
 
+    /// <summary>Permanent: the account, everything it owns, and its Firebase login. See AccountPurgeService.</summary>
     public override ResponseBase<Users> Remove(int entityId)
     {
-        var user = repository.Find(entityId);
-        if (user == null)
-            return ResponseStatus.UserNotFound;
+        return _accountPurgeService.PurgeUserAsync(entityId, "UserService.Remove").GetAwaiter().GetResult();
+    }
 
-        repository.Remove(user);
+    /// <summary>
+    /// Matches ExternalId2 as well. The base looks at ExternalId only, so an account signed in through its
+    /// linked provider got NotFound from user_getCurrentUser and never saw its own profile.
+    /// </summary>
+    public override ResponseBase<Users> GetByExternalId(string externalId)
+    {
+        var user = repository.Where(a => a.ExternalId == externalId || a.ExternalId2 == externalId)
+            .OrderBy(a => a.ExternalId == externalId ? 0 : 1)
+            .ThenBy(a => a.Id)
+            .FirstOrDefault();
+
+        if (user == null)
+            return ResponseBase<Users>.Failure(ResponseStatus.NotFound);
+
+        return user;
+    }
+
+    private bool FirebaseUserStillExists(string externalId)
+    {
         try
         {
-            var auth = FirebaseAuth.GetAuth(firebaseAppCreator.GetFirebaseApp());
-            auth.DeleteUserAsync(user.ExternalId).GetAwaiter().GetResult();
-
-            if (!string.IsNullOrEmpty(user.ExternalId2))
-                auth.DeleteUserAsync(user.ExternalId2).GetAwaiter().GetResult();
+            return _firebaseAccounts.ExistsAsync(externalId).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete Firebase user for local user {UserId}", entityId);
+            _logger.LogWarning(ex, "Could not confirm Firebase uid {ExternalId} before sign-up; allowing it", externalId);
+            return true;
         }
-
-        return ResponseStatus.Success;
     }
 
     //obsolete
