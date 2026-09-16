@@ -256,11 +256,16 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
 
     public async Task<ResponseStatus> CancelSubscription(Users user)
     {
-        var service = new SubscriptionService();
-        var list = await service.ListAsync(new SubscriptionListOptions { Customer = user.StripeCustomerId });
-        foreach (var item in list)
-            if (item.Status == "active")
-                await service.CancelAsync(item.Id);
+        // A null Customer filter makes Stripe list every subscription on the account, so without this
+        // guard a user who never checked out would cancel other customers' active subscriptions.
+        if (!string.IsNullOrEmpty(user.StripeCustomerId))
+        {
+            var service = new SubscriptionService();
+            var list = await service.ListAsync(new SubscriptionListOptions { Customer = user.StripeCustomerId });
+            foreach (var item in list)
+                if (item.Status == "active")
+                    await service.CancelAsync(item.Id);
+        }
 
         var lastMembership = repository.Where(a => a.UserId == user.Id && a.EndDate > DateTime.UtcNow).OrderByDescending(a => a.Id).FirstOrDefault();
 
