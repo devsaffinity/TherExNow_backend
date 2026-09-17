@@ -12,16 +12,23 @@ namespace Aps.Apps.HepNow.Controllers
     public class UploadController : ControllerBase
     {
         private readonly string _bucketName;
+        private readonly string _accessKey;
+        private readonly string _secretKey;
         private readonly IAmazonS3 _s3Client;
         private readonly ILogger<UploadController> _logger;
         private const double TimeoutDuration = 12;
 
+        // Whether the bucket has S3 Transfer Acceleration switched on, re-read every few minutes.
+        private static bool? _accelerationEnabled;
+        private static DateTime _accelerationCheckedAt;
+        private static readonly TimeSpan AccelerationRecheck = TimeSpan.FromMinutes(10);
+
         public UploadController(IConfiguration configuration, ILogger<UploadController> logger)
         {
             _bucketName = configuration["S3Credentials:BucketName"];
-            var accessKey = configuration["S3Credentials:AccessKey"];
-            var secretKey = configuration["S3Credentials:SecretKey"];
-            _s3Client = new AmazonS3Client(accessKey, secretKey, RegionEndpoint.USWest1);
+            _accessKey = configuration["S3Credentials:AccessKey"];
+            _secretKey = configuration["S3Credentials:SecretKey"];
+            _s3Client = new AmazonS3Client(_accessKey, _secretKey, RegionEndpoint.USWest1);
             _logger = logger;
         }
 
@@ -43,11 +50,12 @@ namespace Aps.Apps.HepNow.Controllers
 
                 var initiateResponse = _s3Client.InitiateMultipartUploadAsync(initiateRequest).Result;
 
+                var presignClient = await UploadUrlClientAsync();
                 var presignedUrls = new List<string>();
                 for (var chunkNumber = 1; chunkNumber <= chunks.ChunkCount; chunkNumber++)
                 {
                     // Use the same expiration for each chunk
-                    var presignedUrl = await GeneratePresignedUrl(chunks.key, chunkNumber, TimeoutDuration, initiateResponse.UploadId);
+                    var presignedUrl = await GeneratePresignedUrl(presignClient, chunks.key, chunkNumber, TimeoutDuration, initiateResponse.UploadId);
                     presignedUrls.Add(presignedUrl);
                 }
 
@@ -124,7 +132,37 @@ namespace Aps.Apps.HepNow.Controllers
             }
         }
 
-        private async Task<string> GeneratePresignedUrl(string objectKey, int chunkNumber, double duration, string uploadId)
+        /// <summary>
+        /// The client that signs the part-upload URLs browsers and the mobile apps PUT to. From some networks
+        /// the regional S3 addresses reset TLS connections at random (measured 2026-09-17: 6 of 20 attempts got
+        /// through, shown to users as net::ERR_CONNECTION_RESET), while the Transfer Acceleration endpoint,
+        /// served from CloudFront edge addresses, got through 20 of 20. It is only used once the bucket has
+        /// acceleration enabled, so this code is safe to deploy before or after that switch. The server's own
+        /// S3 calls stay on the regional endpoint.
+        /// </summary>
+        private async Task<IAmazonS3> UploadUrlClientAsync()
+        {
+            if (_accelerationEnabled == null || DateTime.UtcNow - _accelerationCheckedAt > AccelerationRecheck)
+            {
+                try
+                {
+                    var config = await _s3Client.GetBucketAccelerateConfigurationAsync(new GetBucketAccelerateConfigurationRequest { BucketName = _bucketName });
+                    _accelerationEnabled = config.Status == BucketAccelerateStatus.Enabled;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not read Transfer Acceleration status for {Bucket}; signing regional upload URLs", _bucketName);
+                    _accelerationEnabled = false;
+                }
+                _accelerationCheckedAt = DateTime.UtcNow;
+            }
+
+            return _accelerationEnabled == true
+                ? new AmazonS3Client(_accessKey, _secretKey, new AmazonS3Config { RegionEndpoint = RegionEndpoint.USWest1, UseAccelerateEndpoint = true })
+                : _s3Client;
+        }
+
+        private async Task<string> GeneratePresignedUrl(IAmazonS3 client, string objectKey, int chunkNumber, double duration, string uploadId)
         {
             try
             {
@@ -140,7 +178,7 @@ namespace Aps.Apps.HepNow.Controllers
                     UploadId = uploadId
                 };
 
-                return await _s3Client.GetPreSignedURLAsync(request);
+                return await client.GetPreSignedURLAsync(request);
             }
             catch (AmazonS3Exception ex)
             {
