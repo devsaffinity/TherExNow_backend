@@ -20,6 +20,14 @@ public class TranslateService : ITranslateService
     {
         int maxLength = 5000; // Limit AWS Translate
 
+        // Nothing to translate. Amazon rejects an empty request outright ("Text size cannot be
+        // zero"), which surfaced as a 500 and took whole exercise programs down with it: a client
+        // translating a program string by string hits this on the first exercise with a blank note
+        // or a blank instruction step, and the shared program then arrived with no instructions at
+        // all. A blank string translates to itself, so answer it here rather than calling out.
+        if (string.IsNullOrWhiteSpace(input?.Text))
+            return new ResponseBase<string>(input?.Text ?? string.Empty);
+
         if (input.Text.Length > maxLength)
             return CustomResponseStatus.LimitOfMoreThan5000Characters;
 
