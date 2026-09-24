@@ -29,6 +29,36 @@ public class MembershipMutations: MutationBase<Memberships,MembershipInput,IMemb
         return response;
     }
 
+    /// <summary>
+    /// Gives another user a paid plan without a payment -- comp accounts, testers, support fixes.
+    /// Administrators only: the role is read from the verified token, never from the request body,
+    /// so a normal member cannot call this to upgrade anyone (including themselves).
+    /// </summary>
+    [GraphQLName("membership_grantComplimentaryPlan")]
+    public async Task<ResponseBase<Memberships>> GrantComplimentaryPlan([Authentication] Authentication authentication
+        , [Service] IMembershipService service
+        , [Service] INotificationService notificationService
+        , int userId, int planId, int months)
+    {
+        if (authentication.Status != ResponseStatus.Success)
+            return authentication.Status;
+
+        if (authentication.CurrentUser.UserType != UserType.Admin)
+            return CustomResponseStatus.CurrentUserIsNotAdmin;
+
+        var response = service.GrantComplimentaryPlan(userId, planId, months);
+        if (response.Status == ResponseStatus.Success)
+        {
+            await notificationService.Send(new NotificationInput
+            {
+                NotificationType = NotificationType.PlanUpgraded,
+                UserId = userId,
+            });
+        }
+
+        return response;
+    }
+
     [GraphQLIgnore]
     public override ResponseBase<Memberships> Update(ClaimsPrincipal claims, [Service] IMembershipService service, MembershipInput input) => null;
 

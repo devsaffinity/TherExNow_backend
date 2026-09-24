@@ -27,7 +27,9 @@ public class DashboardService : ServiceBase<EntityDef, InputDef>, IDashboardServ
     {
         var result = new DashboardTodayRevenueAndActiveUserDto
         {
-            RevenuePlan = membershipRepository.Where(m => m.CreatedDate.Date == DateTime.UtcNow.Date).Sum(m => m.PaymentAmount),
+            // A complimentary grant carries the plan's real price so it reads as premium everywhere,
+            // but no money changed hands -- it must not inflate revenue.
+            RevenuePlan = membershipRepository.Where(m => m.CreatedDate.Date == DateTime.UtcNow.Date && m.Provider != MembershipProvider.Complimentary).Sum(m => m.PaymentAmount),
             RevenueShop = requestProductRepository.Where(m => m.CreatedDate.Date == DateTime.UtcNow.Date).Sum(m => m.Price * m.Count),
             ActiveUser = userRepository.Where<UserActiveDay>(a => a.Day == DateTime.UtcNow.Date).Count(),
         };
@@ -51,7 +53,7 @@ public class DashboardService : ServiceBase<EntityDef, InputDef>, IDashboardServ
     public ListResponseBase<DashboardRevenuePlanDto> GetRevenuePlan(DateTime startDate, DateTime endDate)
     {
         var result = membershipRepository.GetDbSet()
-            .Where(u => u.CreatedDate.Date >= startDate.Date && u.CreatedDate.Date <= endDate.Date)
+            .Where(u => u.CreatedDate.Date >= startDate.Date && u.CreatedDate.Date <= endDate.Date && u.Provider != MembershipProvider.Complimentary)
             .GroupBy(u => u.CreatedDate.Date).Select(u => new DashboardRevenuePlanDto
             {
                 Date = u.Key,

@@ -7,6 +7,7 @@ public interface IMembershipService: IServiceBase<Memberships, MembershipInput>
     SingleResponseBase<Memberships> GetCurrentMembership(int userId);
     Task<ResponseBase<bool>> CheckMaxTryFreePlan(int userId, NotificationType notificationType);
     ResponseBase AddFreePlan(int userId);
+    ResponseBase<Memberships> GrantComplimentaryPlan(int userId, int planId, int months);
     ResponseBase<IntentDto> CreateIntentForPayment(string email, double amount);
     // `claims` lets the caller hand over the already-resolved principal. Resolvers run inside
     // HotChocolate's own execution scope, and this codebase does not trust IHttpContextAccessor

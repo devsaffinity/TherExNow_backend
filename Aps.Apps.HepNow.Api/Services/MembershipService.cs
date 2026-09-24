@@ -126,6 +126,54 @@ public class MembershipService : ServiceBase<Memberships, MembershipInput>, IMem
         return ResponseStatus.Success;
     }
 
+    /// <summary>
+    /// Gives a user a paid plan without a payment -- for comp accounts, testers and support fixes.
+    /// The membership carries the plan's real price so every "paid member" check treats it as
+    /// premium, but it is stamped <see cref="MembershipProvider.Complimentary"/> and the dashboard
+    /// leaves that out of revenue. Any current membership is ended first, exactly as a real
+    /// purchase does, so the user is never on two at once.
+    /// </summary>
+    public ResponseBase<Memberships> GrantComplimentaryPlan(int userId, int planId, int months)
+    {
+        if (months <= 0)
+            return ResponseStatus.NotEnoghData;
+
+        var user = userRepository.Find(userId);
+        if (user == null)
+            return ResponseStatus.UserNotFound;
+
+        var plan = planRepository.Find(planId);
+        if (plan == null)
+            return CustomResponseStatus.PlanNotFound;
+
+        // A comp grant only means anything on a paid plan; the free tier is already everyone's
+        // default, so granting it here would be a no-op dressed up as an upgrade.
+        var price = plan.PriceMonth > 0 ? plan.PriceMonth : plan.PriceYear;
+        if (price is null or 0)
+            return CustomResponseStatus.PlanNotFound;
+
+        var now = DateTime.UtcNow;
+
+        var current = repository.Get(a => a.UserId == userId && a.EndDate > now);
+        if (current != null)
+        {
+            current.EndDate = now;
+            repository.Update(current, saveNow: false);
+        }
+
+        var membership = new Memberships
+        {
+            UserId = userId,
+            PlanId = planId,
+            PaymentAmount = price.Value,
+            StartDate = now,
+            EndDate = now.AddMonths(months),
+            Provider = MembershipProvider.Complimentary,
+        };
+
+        return ResponseBase<Memberships>.Success(repository.Add(membership));
+    }
+
     public ResponseBase<IntentDto> CreateIntentForPayment(string email, double amount)
     {
 
