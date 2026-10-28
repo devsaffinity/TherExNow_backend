@@ -16,7 +16,8 @@ namespace Aps.Apps.HepNow.Controllers
 
         [HttpPost]
         public async Task<IActionResult> Post([FromServices] IConfiguration configuration, [FromServices]IMembershipRepository membershipRepository
-            , [FromServices] IUserRepository userRepository, [FromServices] IWebhookLogRepository webhookLogRepository)
+            , [FromServices] IUserRepository userRepository, [FromServices] IWebhookLogRepository webhookLogRepository
+            , [FromServices] IUserService userService)
         {
             var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
             var endpointSecret = configuration.GetValue<string>("StripeSettings:WebhookSecret");
@@ -83,20 +84,45 @@ namespace Aps.Apps.HepNow.Controllers
                             if (!isCanceled)
                                 break;
 
-                            var userIdForSub = userRepository.Where(a => a.StripeCustomerId == sub.CustomerId).Select(a => a.Id).FirstOrDefault();
-                            if (userIdForSub == 0)
+                            var userForSub = userRepository.Where(a => a.StripeCustomerId == sub.CustomerId).FirstOrDefault();
+                            if (userForSub == null)
                             {
                                 _logger.LogWarning("Stripe subscription {EventType} referenced unknown customer {CustomerId}", stripeEvent.Type, sub.CustomerId);
                                 break;
                             }
 
-                            var activeMembership = membershipRepository.Where(a => a.UserId == userIdForSub && a.EndDate > DateTime.UtcNow)
+                            var activeMembership = membershipRepository.Where(a => a.UserId == userForSub.Id && a.EndDate > DateTime.UtcNow)
                                 .OrderByDescending(a => a.Id).FirstOrDefault();
                             if (activeMembership != null)
                             {
                                 activeMembership.EndDate = DateTime.UtcNow;
                                 membershipRepository.Update(activeMembership);
-                                _logger.LogInformation("Stripe subscription cancelled for user {UserId}", userIdForSub);
+                                _logger.LogInformation("Stripe subscription cancelled for user {UserId}", userForSub.Id);
+
+                                // Tell the user their subscription ended -- previously it stopped silently.
+                                // Sent only here (where an active membership was actually ended) so the
+                                // duplicate Updated/Deleted events Stripe fires cannot double-notify.
+                                // Best-effort: a send failure must not 500 the webhook, or Stripe retries.
+                                try
+                                {
+                                    if (!string.IsNullOrWhiteSpace(userForSub.Email))
+                                    {
+                                        var name = string.IsNullOrWhiteSpace(userForSub.FullName) ? "there" : userForSub.FullName;
+                                        await userService.SendEmailByAmazonSesAsync(new EmailInput
+                                        {
+                                            To = userForSub.Email,
+                                            Subject = "Your TherExNow subscription has been cancelled",
+                                            Content = $@"Hi {name},<br><br>
+                                                Your TherExNow subscription has been cancelled and your premium access has now ended.<br><br>
+                                                If this was a mistake, or you would like to come back, you can subscribe again at any time from the app or website.<br><br>
+                                                - The TherExNow Team"
+                                        }, userForSub.Id);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Failed to send cancellation email for user {UserId}", userForSub.Id);
+                                }
                             }
                             break;
                         }

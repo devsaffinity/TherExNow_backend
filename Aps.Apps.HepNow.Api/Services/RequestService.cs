@@ -1,3 +1,4 @@
+using System.Text;
 using Aps.Apps.HepNow.Generics.Responses;
 using Aps.Apps.HepNow.Models.Dtos;
 
@@ -65,6 +66,31 @@ public class RequestService : ServiceBase<Requests, RequestInput>, IRequestServi
                   });
 
         return ListResponseBase<RequestDto>.Success(result);
+    }
+
+    public string BuildOrderSummaryHtml(RequestInput input)
+    {
+        var lines = new StringBuilder();
+        decimal total = 0m;
+
+        if (input?.RequestProducts != null)
+        {
+            foreach (var requestProduct in input.RequestProducts)
+            {
+                var product = productRepository.GetById(requestProduct.ProductId);
+                var name = product?.Name ?? $"Product #{requestProduct.ProductId}";
+                // Price was stamped from the product during Add; fall back to the live product price.
+                var price = requestProduct.Price != 0 ? requestProduct.Price : (product?.Price ?? 0m);
+                var lineTotal = price * requestProduct.Count;
+                total += lineTotal;
+
+                var color = string.IsNullOrWhiteSpace(requestProduct.Color) ? "" : $" ({requestProduct.Color})";
+                lines.Append($"{name}{color} — {requestProduct.Count} x ${price:0.00} = ${lineTotal:0.00}<br>");
+            }
+        }
+
+        lines.Append($"<b>Total: ${total:0.00}</b>");
+        return lines.ToString();
     }
     #endregion
 }
